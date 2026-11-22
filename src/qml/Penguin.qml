@@ -45,6 +45,13 @@ Item {
             return
         }
         const next = route.shift()
+        // Something was built on the way: stop here and think again.
+        if (!island.isWalkable(next.x, next.y)) {
+            route = []
+            sitWhenThere = false
+            step()
+            return
+        }
         face(next.x, next.y)
         walking = true
         moveX.to = next.x

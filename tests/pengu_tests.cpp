@@ -2,6 +2,7 @@
 // save files, impossible placements and the like.
 
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -315,6 +316,24 @@ private slots:
         QCOMPARE(copy.find("y")->reminderTime, QString("09:00"));
         QCOMPARE(copy.find("y")->created, today);
         QCOMPARE(copy.stats().value("totalCompleted").toInt(), 1);
+    }
+
+    void ancientDatesCannotFreezeTheApp() {
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today);
+        const QJsonObject evil{
+            {"habits", QJsonArray{QJsonObject{{"id", "a"}, {"name", "A"}, {"created", "0001-01-01"}}}},
+            {"log", QJsonObject{{"0001-01-02", QJsonObject{{"a", QJsonObject{{"status", "done"}}}}},
+                                {"9999-01-01", QJsonObject{{"a", QJsonObject{{"status", "done"}}}}}}}};
+        book.fromJson(evil);
+        QCOMPARE(book.find("a")->created, today);
+        QElapsedTimer timer;
+        timer.start();
+        book.stats();
+        book.heatmap(104);
+        QVERIFY(timer.elapsed() < 500);
+        QCOMPARE(book.stats().value("totalCompleted").toInt(), 0);
     }
 
     // ---------------------------------------------------------------- catalog

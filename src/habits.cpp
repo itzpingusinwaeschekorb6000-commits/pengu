@@ -10,6 +10,8 @@
 
 namespace {
 // Weekday bit for a date, Monday = bit 0.
+const QDate EarliestDate(2000, 1, 1);
+
 int dayBit(const QDate &date) { return 1 << (date.dayOfWeek() - 1); }
 
 QString clip(const QString &text, int length) { return text.trimmed().left(length); }
@@ -426,8 +428,10 @@ void HabitBook::fromJson(const QJsonObject &object) {
             fields.remove("reminderTime");
         if (!applyFields(h, fields))
             continue;
+        // Dates outside [2000, today] are treated as damage: streaks walk every
+        // day from the earliest one, and year 0001 would freeze the app.
         h.created = QDate::fromString(o.value("created").toString(), Qt::ISODate);
-        if (!h.created.isValid())
+        if (!h.created.isValid() || h.created < EarliestDate || h.created > today())
             h.created = today();
         ids.insert(h.id);
         m_habits << h;
@@ -435,7 +439,7 @@ void HabitBook::fromJson(const QJsonObject &object) {
     const QJsonObject log = object.value("log").toObject();
     for (auto it = log.begin(); it != log.end(); ++it) {
         const QDate date = QDate::fromString(it.key(), Qt::ISODate);
-        if (!date.isValid())
+        if (!date.isValid() || date < EarliestDate || date > today())
             continue;
         const QJsonObject day = it.value().toObject();
         for (auto e = day.begin(); e != day.end(); ++e) {

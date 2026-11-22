@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Pengu
+Comment=Build habits and grow a penguin island
+Comment[de]=Gewohnheiten aufbauen und eine Pinguininsel wachsen lassen
+Exec=pengu
+Icon=pengu
+Terminal=false
+Categories=Utility;Game;
+StartupWMClass=pengu
