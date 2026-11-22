@@ -1,0 +1,14 @@
+{
+ "%n done": {
+  "one": "%n done",
+  "other": "%n done"
+ },
+ "%n days perfect streak": {
+  "one": "%n day perfect streak",
+  "other": "%n days perfect streak"
+ },
+ "%n days": {
+  "one": "%n day",
+  "other": "%n days"
+ }
+}

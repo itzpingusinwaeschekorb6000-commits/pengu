@@ -11,11 +11,32 @@
 #include <QQuickWindow>
 #include <QJSValue>
 #include <QTimer>
+#include <QMouseEvent>
+#include <QPointingDevice>
 
 #include "game.h"
 #include "theme.h"
 #include "tilemap.h"
 #include "translator.h"
+
+static void pump(int ms);
+
+static void mouse(QQuickWindow *w, QEvent::Type type, QPointF pos, Qt::MouseButton button, Qt::MouseButtons buttons) {
+    QMouseEvent event(type, pos, w->mapToGlobal(pos), button, buttons, Qt::NoModifier);
+    QGuiApplication::sendEvent(w, &event);
+}
+
+// Presses at a, moves in small steps to b, releases there.
+static void drag(QQuickWindow *w, QPointF a, QPointF b, Qt::MouseButton button = Qt::LeftButton) {
+    mouse(w, QEvent::MouseButtonPress, a, button, button);
+    pump(30);
+    for (int i = 1; i <= 12; ++i) {
+        mouse(w, QEvent::MouseMove, a + (b - a) * (i / 12.0), Qt::NoButton, button);
+        pump(15);
+    }
+    mouse(w, QEvent::MouseButtonRelease, b, button, Qt::NoButton);
+    pump(50);
+}
 
 static void pump(int ms) {
     QElapsedTimer t;
@@ -74,6 +95,16 @@ int main(int argc, char *argv[]) {
         const QString step = args.at(i);
         if (step.startsWith("wait:")) {
             pump(step.mid(5).toInt());
+        } else if (step.startsWith("click:") || step.startsWith("rclick:")) {
+            const QStringList n = step.section(':', 1).split(',');
+            const QPointF at(n.value(0).toDouble(), n.value(1).toDouble());
+            drag(window, at, at, step.startsWith("r") ? Qt::RightButton : Qt::LeftButton);
+            pump(250);
+        } else if (step.startsWith("drag:")) {
+            const QStringList n = step.mid(5).split(',');
+            drag(window, QPointF(n.value(0).toDouble(), n.value(1).toDouble()),
+                 QPointF(n.value(2).toDouble(), n.value(3).toDouble()));
+            pump(300);
         } else if (step.startsWith("png:")) {
             window->grabWindow().save(step.mid(4));
         } else {

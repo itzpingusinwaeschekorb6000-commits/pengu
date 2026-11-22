@@ -15,9 +15,12 @@ Item {
     signal edit()
     signal remove()
 
-    readonly property real leftWidth: mode === "todo" ? 140 : 80
-    readonly property real rightWidth: 140
+    // Wide enough for the German labels ("Überspringen").
+    readonly property int actionWidth: 116
+    readonly property real leftWidth: mode === "todo" ? actionWidth * 2 + 12 : actionWidth + 6
+    readonly property real rightWidth: actionWidth * 2 + 12
     implicitHeight: face.implicitHeight
+    clip: true
 
     function close() { face.x = 0 }
 
@@ -29,19 +32,19 @@ Item {
         spacing: 6
         PillButton {
             visible: card.mode === "todo"
-            width: 64; height: parent.height
+            width: card.actionWidth; height: parent.height
             text: qsTr("Done"); fill: Ui.green; textColor: "#10200c"; fontSize: 13
             onClicked: { card.close(); card.markDone() }
         }
         PillButton {
             visible: card.mode === "todo"
-            width: 64; height: parent.height
+            width: card.actionWidth; height: parent.height
             text: qsTr("Skip"); fill: Ui.gray; textColor: "#151515"; fontSize: 13
             onClicked: { card.close(); card.markSkipped() }
         }
         PillButton {
             visible: card.mode !== "todo"
-            width: 74; height: parent.height
+            width: card.actionWidth; height: parent.height
             text: qsTr("Undo"); fill: Ui.gray; textColor: "#151515"; fontSize: 13
             onClicked: { card.close(); card.undo() }
         }
@@ -53,12 +56,12 @@ Item {
         height: parent.height
         spacing: 6
         PillButton {
-            width: 64; height: parent.height
+            width: card.actionWidth; height: parent.height
             text: qsTr("Edit"); fill: Ui.blue; fontSize: 13
             onClicked: { card.close(); card.edit() }
         }
         PillButton {
-            width: 64; height: parent.height
+            width: card.actionWidth; height: parent.height
             text: qsTr("Delete"); fill: Ui.red; fontSize: 13
             onClicked: { card.close(); card.remove() }
         }

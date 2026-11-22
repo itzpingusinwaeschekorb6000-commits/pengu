@@ -5,6 +5,7 @@ ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 mkdir -p "$ROOT/build/tests"
 cd "$ROOT/build/tests"
 
+"$ROOT/bin/qrc"
 qmake6 "$ROOT/tests/pengu_tests.pro"
 make -j"$(nproc)"
 QT_QPA_PLATFORM=offscreen ./pengu_tests

@@ -224,6 +224,8 @@ Item {
                 const reason = island.canPlace(view.placing, t.x, t.y)
                 if (reason !== "" || !island.place(view.placing, t.x, t.y)) {
                     view.placeFailed(reason)
+                    if (reason === "none" || reason === "unknown")
+                        view.placing = ""
                     return
                 }
                 if (island.available(view.placing) <= 0)
