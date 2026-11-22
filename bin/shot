@@ -1,0 +1,11 @@
+#!/bin/sh
+# Builds the offscreen screenshot harness and runs it with the given arguments.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+"$ROOT/bin/qrc"
+mkdir -p "$ROOT/build/shot"
+cd "$ROOT/build/shot"
+qmake6 "$ROOT/tests/shot.pro" >/dev/null
+make -j"$(nproc)" >/dev/null
+cd "$ROOT"
+QT_FORCE_STDERR_LOGGING=1 exec "$ROOT/build/shot/shot" "$@"

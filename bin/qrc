@@ -1,0 +1,14 @@
+#!/bin/sh
+# Regenerates src/resources.qrc from the files in src/, so a new sprite, QML
+# file or translation is picked up without editing XML by hand.
+set -eu
+cd "$(dirname -- "$0")/../src"
+{
+  echo '<RCC>'
+  echo '    <qresource prefix="/">'
+  for f in qml/qmldir qml/*.qml sprites/*.svg data/*.json i18n/*.json; do
+    [ -e "$f" ] && echo "        <file>$f</file>"
+  done
+  echo '    </qresource>'
+  echo '</RCC>'
+} > resources.qrc

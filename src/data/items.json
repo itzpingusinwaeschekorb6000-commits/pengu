@@ -1,0 +1,156 @@
+{
+  "categories": [
+    {"id": "nature", "name": {"en": "Nature", "de": "Natur"}},
+    {"id": "decor", "name": {"en": "Decorations", "de": "Dekoration"}},
+    {"id": "structures", "name": {"en": "Structures", "de": "Bauten"}},
+    {"id": "terrain", "name": {"en": "Terrain", "de": "Terrain"}}
+  ],
+  "trays": [
+    {"id": "trees", "name": {"en": "Trees", "de": "Bäume"}, "sprite": "milkwood.svg"},
+    {"id": "plants", "name": {"en": "Plants", "de": "Pflanzen"}, "sprite": "protea_pink.svg"},
+    {"id": "rocks", "name": {"en": "Rocks & Wood", "de": "Felsen & Holz"}, "sprite": "boulder.svg"},
+    {"id": "structures", "name": {"en": "Structures", "de": "Bauten"}, "sprite": "hut.svg"},
+    {"id": "camp", "name": {"en": "Camp", "de": "Lager"}, "sprite": "campfire.svg"},
+    {"id": "terrain", "name": {"en": "Terrain", "de": "Terrain"}, "terrain": "sand"}
+  ],
+  "items": [
+    {"id": "nest", "added": 1, "category": "structures", "tray": "camp",
+     "name": {"en": "Nest", "de": "Nest"},
+     "variants": [{"id": "nest", "price": 40, "sprite": "nest.svg", "size": [46, 26], "solid": false, "rest": true}]},
+
+    {"id": "milkwood", "added": 2, "category": "nature", "tray": "trees",
+     "name": {"en": "Milkwood Tree", "de": "Milkwood-Baum"},
+     "variants": [
+       {"id": "milkwood-large", "name": {"en": "Milkwood Large", "de": "Milkwood groß"}, "price": 30, "sprite": "milkwood.svg", "size": [76, 100]},
+       {"id": "milkwood-medium", "name": {"en": "Milkwood Medium", "de": "Milkwood mittel"}, "price": 25, "sprite": "milkwood.svg", "size": [60, 80]},
+       {"id": "milkwood-small", "name": {"en": "Milkwood Small", "de": "Milkwood klein"}, "price": 20, "sprite": "milkwood.svg", "size": [44, 58]}
+     ]},
+
+    {"id": "pine", "added": 3, "category": "nature", "tray": "trees",
+     "name": {"en": "Stone Pine", "de": "Pinie"},
+     "variants": [{"id": "pine", "price": 35, "sprite": "pine.svg", "size": [80, 110]}]},
+
+    {"id": "strelitzia", "added": 4, "category": "nature", "tray": "trees",
+     "name": {"en": "Wild Banana", "de": "Baum-Strelitzie"},
+     "variants": [
+       {"id": "strelitzia-tall", "name": {"en": "Wild Banana Tall", "de": "Baum-Strelitzie hoch"}, "price": 35, "sprite": "strelitzia.svg", "size": [64, 104]},
+       {"id": "strelitzia-small", "name": {"en": "Wild Banana Small", "de": "Baum-Strelitzie klein"}, "price": 15, "sprite": "strelitzia.svg", "size": [42, 68]}
+     ]},
+
+    {"id": "protea", "added": 5, "category": "nature", "tray": "plants",
+     "name": {"en": "Protea", "de": "Protea"},
+     "variants": [
+       {"id": "protea-pink", "name": {"en": "King Protea", "de": "Königsprotea"}, "price": 10, "sprite": "protea_pink.svg", "size": [26, 32], "solid": false},
+       {"id": "protea-white", "name": {"en": "White Protea", "de": "Weiße Protea"}, "price": 10, "sprite": "protea_white.svg", "size": [26, 32], "solid": false}
+     ]},
+
+    {"id": "bird-of-paradise", "added": 6, "category": "nature", "tray": "plants",
+     "name": {"en": "Bird of Paradise", "de": "Paradiesvogelblume"},
+     "variants": [{"id": "bird-of-paradise", "price": 15, "sprite": "bird_of_paradise.svg", "size": [32, 40], "solid": false}]},
+
+    {"id": "dune-grass", "added": 7, "category": "nature", "tray": "plants",
+     "name": {"en": "Dune Grass", "de": "Dünengras"},
+     "variants": [
+       {"id": "dune-grass", "name": {"en": "Dune Grass", "de": "Dünengras"}, "price": 5, "sprite": "grass.svg", "size": [28, 20], "solid": false},
+       {"id": "dune-grass-tall", "name": {"en": "Dune Grass Tall", "de": "Dünengras hoch"}, "price": 8, "sprite": "grass.svg", "size": [36, 30], "solid": false}
+     ]},
+
+    {"id": "ice-plant", "added": 8, "category": "nature", "tray": "plants",
+     "name": {"en": "Ice Plant", "de": "Mittagsblume"},
+     "variants": [{"id": "ice-plant", "price": 8, "sprite": "ice_plant.svg", "size": [36, 20], "solid": false}]},
+
+    {"id": "kelp", "added": 9, "category": "nature", "tray": "plants",
+     "name": {"en": "Kelp Pile", "de": "Seetang-Haufen"},
+     "variants": [{"id": "kelp", "price": 10, "sprite": "kelp.svg", "size": [40, 20], "solid": false}]},
+
+    {"id": "boulder", "added": 10, "category": "nature", "tray": "rocks",
+     "name": {"en": "Granite Boulder", "de": "Granitfels"},
+     "variants": [
+       {"id": "boulder-small", "name": {"en": "Boulder Small", "de": "Granitfels klein"}, "price": 10, "sprite": "boulder.svg", "size": [32, 24]},
+       {"id": "boulder-medium", "name": {"en": "Boulder Medium", "de": "Granitfels mittel"}, "price": 20, "sprite": "boulder.svg", "size": [50, 38]},
+       {"id": "boulder-large", "name": {"en": "Boulder Large", "de": "Granitfels groß"}, "price": 35, "sprite": "boulder.svg", "size": [70, 54]}
+     ]},
+
+    {"id": "driftwood", "added": 11, "category": "nature", "tray": "rocks",
+     "name": {"en": "Driftwood", "de": "Treibholz"},
+     "variants": [{"id": "driftwood", "price": 10, "sprite": "driftwood.svg", "size": [52, 24]}]},
+
+    {"id": "shell", "added": 12, "category": "decor", "tray": "rocks",
+     "name": {"en": "Shells", "de": "Muscheln"},
+     "variants": [{"id": "shell", "price": 5, "sprite": "shell.svg", "size": [26, 16], "solid": false}]},
+
+    {"id": "campfire", "added": 13, "category": "decor", "tray": "camp",
+     "name": {"en": "Campfire", "de": "Lagerfeuer"},
+     "variants": [{"id": "campfire", "price": 50, "sprite": "campfire.svg", "size": [38, 40], "glow": true}]},
+
+    {"id": "cauldron", "added": 14, "category": "decor", "tray": "camp",
+     "name": {"en": "Fish Soup Pot", "de": "Fischsuppen-Topf"},
+     "variants": [{"id": "cauldron", "price": 100, "sprite": "cauldron.svg", "size": [44, 44], "glow": true}]},
+
+    {"id": "sardines", "added": 15, "category": "decor", "tray": "camp",
+     "name": {"en": "Sardine Pile", "de": "Sardinen-Haufen"},
+     "variants": [
+       {"id": "sardines-small", "name": {"en": "Sardine Pile Small", "de": "Sardinen-Haufen klein"}, "price": 20, "sprite": "sardines_small.svg", "size": [34, 20], "solid": false},
+       {"id": "sardines-large", "name": {"en": "Sardine Pile Large", "de": "Sardinen-Haufen groß"}, "price": 40, "sprite": "sardines_large.svg", "size": [42, 34]}
+     ]},
+
+    {"id": "torch", "added": 16, "category": "decor", "tray": "camp",
+     "name": {"en": "Tiki Torch", "de": "Fackel"},
+     "variants": [{"id": "torch", "price": 75, "sprite": "torch.svg", "size": [16, 56], "glow": true}]},
+
+    {"id": "lantern", "added": 17, "category": "decor", "tray": "camp",
+     "name": {"en": "Lantern", "de": "Laterne"},
+     "variants": [{"id": "lantern", "price": 60, "sprite": "lantern.svg", "size": [22, 34], "glow": true}]},
+
+    {"id": "sign", "added": 18, "category": "decor", "tray": "structures",
+     "name": {"en": "Sign", "de": "Schild"},
+     "variants": [{"id": "sign", "price": 25, "sprite": "sign.svg", "size": [40, 40]}]},
+
+    {"id": "lifebuoy", "added": 19, "category": "decor", "tray": "structures",
+     "name": {"en": "Lifebuoy Post", "de": "Rettungsring"},
+     "variants": [{"id": "lifebuoy", "price": 30, "sprite": "lifebuoy.svg", "size": [30, 46]}]},
+
+    {"id": "surf-rack", "added": 20, "category": "decor", "tray": "structures",
+     "name": {"en": "Surf Rack", "de": "Surfbrett-Ständer"},
+     "variants": [{"id": "surf-rack", "price": 250, "sprite": "surf_rack.svg", "size": [56, 56]}]},
+
+    {"id": "hammock", "added": 21, "category": "decor", "tray": "structures",
+     "name": {"en": "Hammock", "de": "Hängematte"},
+     "variants": [{"id": "hammock", "price": 200, "sprite": "hammock.svg", "size": [70, 44]}]},
+
+    {"id": "burrow", "added": 22, "category": "structures", "tray": "structures",
+     "name": {"en": "Breeding Burrow", "de": "Bruthöhle"},
+     "variants": [{"id": "burrow", "price": 45, "sprite": "burrow.svg", "size": [52, 34], "rest": true}]},
+
+    {"id": "hut", "added": 23, "category": "structures", "tray": "structures",
+     "name": {"en": "Beach Hut", "de": "Strandhütte"},
+     "variants": [
+       {"id": "hut-blue", "name": {"en": "Beach Hut Blue", "de": "Strandhütte blau"}, "price": 150, "sprite": "hut.svg", "size": [62, 72]},
+       {"id": "hut-red", "name": {"en": "Beach Hut Red", "de": "Strandhütte rot"}, "price": 150, "sprite": "hut_red.svg", "size": [62, 72]}
+     ]},
+
+    {"id": "rowboat", "added": 24, "category": "structures", "tray": "structures",
+     "name": {"en": "Rowboat", "de": "Ruderboot"},
+     "variants": [{"id": "rowboat", "price": 180, "sprite": "rowboat.svg", "size": [70, 34]}]},
+
+    {"id": "lighthouse", "added": 25, "category": "structures", "tray": "structures",
+     "name": {"en": "Lighthouse", "de": "Leuchtturm"},
+     "variants": [{"id": "lighthouse", "price": 400, "sprite": "lighthouse.svg", "size": [48, 130], "glow": true}]},
+
+    {"id": "tiles", "added": 26, "category": "terrain", "tray": "terrain",
+     "name": {"en": "Tiles", "de": "Bodenplatten"},
+     "variants": [
+       {"id": "tile-sand", "name": {"en": "Sand Tile", "de": "Sandplatte"}, "price": 10, "terrain": "sand"},
+       {"id": "tile-grass", "name": {"en": "Fynbos Tile", "de": "Fynbos-Platte"}, "price": 10, "terrain": "grass"},
+       {"id": "tile-granite", "name": {"en": "Granite Tile", "de": "Granitplatte"}, "price": 12, "terrain": "granite"}
+     ]},
+
+    {"id": "boardwalk", "added": 27, "category": "terrain", "tray": "terrain",
+     "name": {"en": "Boardwalk", "de": "Holzsteg"},
+     "variants": [{"id": "boardwalk", "price": 10, "terrain": "boardwalk"}]},
+
+    {"id": "straw-mat", "added": 28, "category": "terrain", "tray": "terrain",
+     "name": {"en": "Straw Mat", "de": "Strohmatte"},
+     "variants": [{"id": "straw-mat", "price": 15, "terrain": "straw"}]}
+  ]
+}
