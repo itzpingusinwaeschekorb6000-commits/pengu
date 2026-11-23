@@ -38,7 +38,9 @@ Flickable {
         Group {
             SettingRow {
                 title: qsTr("Enable Notifications")
-                description: profile.notifications ? qsTr("Enabled. Pengu sends desktop notifications while it is open.") : qsTr("Disabled")
+                description: !profile.notifications ? qsTr("Disabled")
+                    : window.mobile ? qsTr("Enabled. Pengu reminds you even when the app is closed.")
+                    : qsTr("Enabled. Pengu sends desktop notifications while it is open.")
                 Switch {
                     checked: profile.notifications
                     onToggled: {
@@ -87,6 +89,33 @@ Flickable {
                 title: qsTr("Reset XP & Sardines")
                 description: qsTr("Level %1 • %2 XP • %3 sardines").arg(profile.level).arg(profile.xp).arg(profile.fish)
                 PillButton { text: qsTr("Reset"); fill: Ui.red; onClicked: confirmReset.open() }
+            }
+        }
+
+        Section { text: qsTr("APP") }
+        Group {
+            SettingRow {
+                title: qsTr("Version %1").arg(updater.version)
+                description: !updater.supported ? qsTr("Updates are installed with git and bin/install in this build.")
+                    : updater.state === "checking" ? qsTr("Checking for updates…")
+                    : updater.state === "current" ? qsTr("Pengu is up to date.")
+                    : updater.state === "available" ? qsTr("Version %1 is ready.").arg(updater.latestVersion)
+                    : updater.state === "downloading" ? qsTr("Downloading update… %1%").arg(Math.round(updater.progress * 100))
+                    : updater.state === "installing" ? qsTr("Installing update…")
+                    : updater.state === "restart" ? qsTr("Restart Pengu to use version %1.").arg(updater.latestVersion)
+                    : updater.error !== "" ? updater.error
+                    : qsTr("Pengu looks for updates by itself.")
+                PillButton {
+                    visible: updater.supported
+                    enabled: updater.state !== "checking" && updater.state !== "downloading" && updater.state !== "installing"
+                    text: updater.state === "available" || updater.state === "error" ? qsTr("Update now")
+                        : updater.state === "restart" ? qsTr("Restart")
+                        : qsTr("Check")
+                    fill: updater.state === "available" ? Ui.green : Ui.cardHi
+                    textColor: updater.state === "available" ? Ui.outline : Ui.text
+                    onClicked: updater.state === "available" || updater.state === "error" ? updater.install()
+                             : updater.state === "restart" ? updater.restart() : updater.check()
+                }
             }
         }
 

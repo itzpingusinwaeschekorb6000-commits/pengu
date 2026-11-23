@@ -44,6 +44,10 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
     connect(&m_roundingPoll, &QTimer::timeout, this, &Theme::refreshRounding);
     if (!m_hyprctl.isEmpty())
         m_roundingPoll.start();
+#ifdef Q_OS_ANDROID
+    // Phones have no Omarchy theme; rounded corners suit touch screens.
+    m_radius = 12;
+#endif
     reload();
 }
 

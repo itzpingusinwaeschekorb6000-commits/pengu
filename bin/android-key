@@ -1,0 +1,28 @@
+#!/bin/sh
+# Creates the release signing key once, in ~/.config/pengu-signing.
+# Every Pengu APK must be signed with this same key, or phones refuse to
+# install it as an update. Back the folder up; it cannot be recreated.
+# Prints the values CI needs as GitHub secrets.
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+. "$ROOT/bin/android-env"
+
+KEYSTORE="$PENGU_KEY_DIR/pengu-release.jks"
+if [ ! -f "$KEYSTORE" ]; then
+  mkdir -p "$PENGU_KEY_DIR"
+  chmod 700 "$PENGU_KEY_DIR"
+  PASSWORD="$(head -c 24 /dev/urandom | base64 | tr -d '/+=')"
+  "$JAVA_HOME/bin/keytool" -genkeypair -keystore "$KEYSTORE" -storepass "$PASSWORD" -keypass "$PASSWORD" \
+    -alias pengu -keyalg RSA -keysize 4096 -validity 36500 -dname "CN=Pengu" >/dev/null
+  printf '%s\n' "$PASSWORD" > "$PENGU_KEY_DIR/password"
+  chmod 600 "$KEYSTORE" "$PENGU_KEY_DIR/password"
+  echo "Created $KEYSTORE"
+fi
+
+if [ "${1:-}" = "--secrets" ]; then
+  echo "ANDROID_KEYSTORE_BASE64:"
+  base64 -w0 "$KEYSTORE"
+  echo
+  echo "ANDROID_KEYSTORE_PASSWORD:"
+  cat "$PENGU_KEY_DIR/password"
+fi

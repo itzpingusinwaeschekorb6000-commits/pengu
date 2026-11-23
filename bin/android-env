@@ -1,0 +1,23 @@
+# Sourced by the Android scripts: where the toolchain lives. Override any of
+# these in the environment (CI does).
+QT_VERSION_ANDROID="${QT_VERSION_ANDROID:-6.12.0}"
+NDK_VERSION="${NDK_VERSION:-27.2.12479018}"
+ANDROID_PLATFORM="${ANDROID_PLATFORM:-android-36}"
+BUILD_TOOLS="${BUILD_TOOLS:-36.0.0}"
+
+QT_ROOT="${QT_ROOT:-$HOME/Qt}"
+QT_ANDROID="${QT_ANDROID:-$QT_ROOT/$QT_VERSION_ANDROID/android_arm64_v8a}"
+QT_HOST="${QT_HOST:-$QT_ROOT/$QT_VERSION_ANDROID/gcc_64}"
+export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
+export ANDROID_HOME="$ANDROID_SDK_ROOT"
+export ANDROID_NDK_ROOT="${ANDROID_NDK_ROOT:-$ANDROID_SDK_ROOT/ndk/$NDK_VERSION}"
+export ANDROID_OPENSSL="${ANDROID_OPENSSL:-$HOME/Android/android_openssl}"
+if [ -z "${JAVA_HOME:-}" ] && command -v mise >/dev/null; then
+  JAVA_HOME="$(mise where java@temurin-17 2>/dev/null || true)"
+fi
+export JAVA_HOME
+export PATH="$JAVA_HOME/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH"
+
+# The release key that signs every APK. Updates only install over an app
+# signed with the same key, so keep this folder safe (and backed up).
+PENGU_KEY_DIR="${PENGU_KEY_DIR:-$HOME/.config/pengu-signing}"

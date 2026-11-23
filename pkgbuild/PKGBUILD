@@ -1,11 +1,13 @@
 pkgname=pengu
-pkgver=0.1.0
+# Same version as the Android app: VERSION plus the commit count. Computed
+# here rather than in pkgver(), which would rewrite this file on every build.
+pkgver="$(cat "$startdir/../VERSION").${PENGU_BUILD:-$(git -C "$startdir/.." rev-list --count HEAD)}"
 pkgrel=1
 pkgdesc='Build habits and grow an African penguin island'
 arch=('x86_64' 'aarch64')
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'libnotify')
-makedepends=('gcc' 'make')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'libnotify' 'polkit')
+makedepends=('gcc' 'make' 'git')
 options=('!debug')
 source=()
 sha256sums=()

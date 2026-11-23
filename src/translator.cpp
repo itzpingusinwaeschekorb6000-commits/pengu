@@ -106,7 +106,12 @@ void Translator::reload() {
         m_watcher.addPath(m_languageFile);
 
     // Catalogs are compiled in, so only a different language needs a reload.
+#ifdef Q_OS_ANDROID
+    // No Omarchy on the phone: follow the system language.
+    const QString language = QLocale::system().name().section('_', 0, 0);
+#else
     const QString language = readLanguage(m_languageFile);
+#endif
     if (language == m_language)
         return;
 

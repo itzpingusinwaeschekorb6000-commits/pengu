@@ -12,11 +12,12 @@
 #include "theme.h"
 #include "tilemap.h"
 #include "translator.h"
+#include "updater.h"
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
     app.setApplicationName("pengu");
-    app.setApplicationVersion("0.1.0");
+    app.setApplicationVersion(PENGU_VERSION);
 
     // Matches the window to pengu.desktop, so the compositor (Wayland app_id)
     // and the launcher pick up the installed icon.
@@ -37,6 +38,7 @@ int main(int argc, char *argv[]) {
     QObject::connect(&translator, &Translator::changed, game.catalog(),
                      [&] { game.catalog()->setLanguage(translator.language()); });
     game.load();
+    Updater updater;
 
     qmlRegisterType<TileMap>("Pengu", 1, 0, "TileMap");
     qmlRegisterUncreatableType<Island>("Pengu", 1, 0, "Island", "Provided by the game");
@@ -52,6 +54,7 @@ int main(int argc, char *argv[]) {
     context->setContextProperty("habits", game.habits());
     context->setContextProperty("island", game.island());
     context->setContextProperty("reminders", game.reminders());
+    context->setContextProperty("updater", &updater);
     engine.load(QUrl("qrc:/qml/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

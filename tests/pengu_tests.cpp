@@ -630,6 +630,35 @@ private slots:
         QCOMPARE(sent.size(), 3);
     }
 
+    void plannedRemindersCoverTheComingDays() {
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today);
+        Reminders reminders(&book, &p);
+        const QString id = book.add({{"name", "Floss"}, {"reminder", true}, {"reminderTime", "21:15"}});
+        p.setMorningReminder(true);
+        p.setEveningReminder(true);
+        const QDateTime noon(today, QTime(12, 0));
+        QVERIFY(reminders.planned(noon, 3).isEmpty()); // Notifications are off.
+
+        p.setNotifications(true);
+        auto plan = reminders.planned(noon, 3);
+        // Today's morning has passed: evening + habit today, then all three
+        // on each of the next two days, in time order.
+        QCOMPARE(plan.size(), 8);
+        QCOMPARE(plan.first().key, "evening:" + iso(today));
+        QCOMPARE(plan.at(1).key, "habit:" + id + ":" + iso(today));
+        QCOMPARE(plan.at(2).key, "morning:" + iso(today.addDays(1)));
+        for (int i = 1; i < plan.size(); ++i)
+            QVERIFY(plan.at(i - 1).at <= plan.at(i).at);
+
+        // Done today: no habit or evening reminder today, later days unchanged.
+        book.setStatus(id, iso(today), "done");
+        plan = reminders.planned(noon, 3);
+        QCOMPARE(plan.size(), 6);
+        QCOMPARE(plan.first().key, "morning:" + iso(today.addDays(1)));
+    }
+
     void eveningSkipsWhenAllDoneAndLateRemindersWork() {
         Profile p;
         HabitBook book(&p);

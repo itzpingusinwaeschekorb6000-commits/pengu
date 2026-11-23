@@ -1,0 +1,40 @@
+#!/bin/sh
+# Builds the signed Android APK into build/android/pengu.apk from the same
+# sources as the desktop app. Needs bin/android-setup and bin/android-key.
+# PENGU_KEYSTORE / PENGU_KEYSTORE_PASSWORD override the local key (CI).
+set -eu
+ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+. "$ROOT/bin/android-env"
+
+KEYSTORE="${PENGU_KEYSTORE:-$PENGU_KEY_DIR/pengu-release.jks}"
+if [ -z "${PENGU_KEYSTORE_PASSWORD:-}" ] && [ -f "$PENGU_KEY_DIR/password" ]; then
+  PENGU_KEYSTORE_PASSWORD="$(cat "$PENGU_KEY_DIR/password")"
+fi
+[ -f "$KEYSTORE" ] || { echo "No signing key. Run bin/android-key first." >&2; exit 1; }
+
+"$ROOT/bin/qrc"
+OUT="$ROOT/build/android"
+mkdir -p "$OUT"
+cd "$OUT"
+"$QT_ANDROID/bin/qmake" "$ROOT/pengu.pro" ANDROID_ABIS=arm64-v8a
+make -j"$(nproc)"
+make install INSTALL_ROOT="$OUT/android-build" >/dev/null
+
+# Compressed native libraries: the APK (and every update download) shrinks
+# to about a third. qmake has no switch for it, so set it in the settings.
+SETTINGS="$OUT/android-pengu-deployment-settings.json"
+python3 -c 'import json,sys; p=sys.argv[1]; d=json.load(open(p)); d["android-legacy-packaging"]=True; json.dump(d,open(p,"w"),indent=3)' "$SETTINGS"
+
+QT_ANDROID_KEYSTORE_STORE_PASS="$PENGU_KEYSTORE_PASSWORD" \
+QT_ANDROID_KEYSTORE_KEY_PASS="$PENGU_KEYSTORE_PASSWORD" \
+"$QT_HOST/bin/androiddeployqt" \
+  --input "$SETTINGS" \
+  --output "$OUT/android-build" \
+  --android-platform "$ANDROID_PLATFORM" \
+  --jdk "$JAVA_HOME" \
+  --gradle --release \
+  --sign "$KEYSTORE" pengu
+
+APK="$(find "$OUT/android-build/build/outputs/apk/release" -name '*.apk' | head -n1)"
+cp "$APK" "$OUT/pengu.apk"
+echo "Built $OUT/pengu.apk"

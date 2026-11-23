@@ -1,0 +1,111 @@
+# Every push to main builds Pengu for Android and Linux from the same
+# sources and publishes both as a GitHub release. The apps find it through
+# the release's version.json and offer "Update now".
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**", "LICENSE"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      build: ${{ steps.v.outputs.build }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - id: v
+        run: |
+          build=$(git rev-list --count HEAD)
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "version=$(cat VERSION).$build" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: version
+    runs-on: ubuntu-24.04
+    env:
+      PENGU_BUILD: ${{ needs.version.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "17" }
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/Qt
+            ~/Android/android_openssl
+          key: android-toolchain-${{ hashFiles('bin/android-env') }}
+      - name: Toolchain
+        run: bin/android-setup
+      - name: Build APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PENGU_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          export PENGU_KEYSTORE="$RUNNER_TEMP/pengu-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$PENGU_KEYSTORE"
+          bin/android-build
+          rm -f "$PENGU_KEYSTORE"
+      - uses: actions/upload-artifact@v4
+        with: { name: android, path: build/android/pengu.apk, if-no-files-found: error }
+
+  linux:
+    needs: version
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    env:
+      PENGU_BUILD: ${{ needs.version.outputs.build }}
+    steps:
+      - name: Dependencies
+        run: pacman -Syu --noconfirm --needed base-devel git qt6-base qt6-declarative qt6-svg qt6-wayland libnotify polkit
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Test
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          bin/test
+      - name: Package
+        run: |
+          useradd -m builder
+          chown -R builder "$GITHUB_WORKSPACE"
+          su builder -c "git config --global --add safe.directory '$GITHUB_WORKSPACE' && cd '$GITHUB_WORKSPACE/pkgbuild' && PENGU_BUILD=$PENGU_BUILD makepkg -f --noconfirm"
+          cp pkgbuild/pengu-*-x86_64.pkg.tar.zst pengu-x86_64.pkg.tar.zst
+      - uses: actions/upload-artifact@v4
+        with: { name: linux, path: pengu-x86_64.pkg.tar.zst, if-no-files-found: error }
+
+  release:
+    needs: [version, android, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      BUILD: ${{ needs.version.outputs.build }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: Publish
+        run: |
+          cd dist
+          notes=$(git log -1 --format=%s)
+          jq -n --argjson build "$BUILD" --arg version "$VERSION" --arg notes "$notes" \
+                --arg apk "$(sha256sum pengu.apk | cut -d' ' -f1)" \
+                --arg pkg "$(sha256sum pengu-x86_64.pkg.tar.zst | cut -d' ' -f1)" \
+            '{build: $build, version: $version, notes: $notes,
+              assets: {android: {file: "pengu.apk", sha256: $apk},
+                       linux: {file: "pengu-x86_64.pkg.tar.zst", sha256: $pkg}}}' > version.json
+          cat version.json
+          gh release create "v$VERSION" pengu.apk pengu-x86_64.pkg.tar.zst version.json \
+            --title "Pengu $VERSION" --notes "$notes" --latest

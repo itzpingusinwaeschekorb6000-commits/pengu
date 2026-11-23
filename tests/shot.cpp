@@ -18,6 +18,7 @@
 #include "theme.h"
 #include "tilemap.h"
 #include "translator.h"
+#include "updater.h"
 
 static void pump(int ms);
 
@@ -60,6 +61,8 @@ int main(int argc, char *argv[]) {
     game.load();
     qmlRegisterType<TileMap>("Pengu", 1, 0, "TileMap");
     qmlRegisterUncreatableType<Island>("Pengu", 1, 0, "Island", "Provided by the game");
+    // Not configured, so it never goes online; steps can still set its state.
+    Updater updater(nullptr, QString());
     QQmlApplicationEngine engine;
     auto *c = engine.rootContext();
     c->setContextProperty("translator", &translator);
@@ -70,6 +73,10 @@ int main(int argc, char *argv[]) {
     c->setContextProperty("habits", game.habits());
     c->setContextProperty("island", game.island());
     c->setContextProperty("reminders", game.reminders());
+    c->setContextProperty("updater", &updater);
+    // PENGU_UPDATE_PREVIEW=available:0.2.99[:0.4] shows the update banner.
+    if (const QStringList p = qEnvironmentVariable("PENGU_UPDATE_PREVIEW").split(':'); p.size() >= 2)
+        updater.preview(p.at(0), p.at(1), p.value(2).toDouble());
     engine.load(QUrl("qrc:/qml/Main.qml"));
     if (engine.rootObjects().isEmpty())
         return 1;

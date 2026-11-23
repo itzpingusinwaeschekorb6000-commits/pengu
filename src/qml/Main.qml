@@ -7,8 +7,9 @@ ApplicationWindow {
     id: window
     width: 1120
     height: 780
-    minimumWidth: 720
-    minimumHeight: 560
+    readonly property bool mobile: Qt.platform.os === "android" || Qt.platform.os === "ios"
+    minimumWidth: mobile ? 0 : 720
+    minimumHeight: mobile ? 0 : 560
     visible: true
     title: "Pengu"
     color: Ui.bg
@@ -25,6 +26,20 @@ ApplicationWindow {
 
     function toast(text, isError) { toaster.show(text, isError) }
     function celebrate(amount) { reward.show(amount) }
+
+    // Android's back gesture closes the window: step back to the island
+    // first, and only leave the app from there.
+    onClosing: (close) => {
+        if (!mobile)
+            return
+        if (helpVisible) {
+            helpVisible = false
+            close.accepted = false
+        } else if (screen !== "island") {
+            go("island")
+            close.accepted = false
+        }
+    }
 
     function go(next) {
         helpVisible = false
@@ -57,8 +72,14 @@ ApplicationWindow {
 
     // Right-to-left languages mirror the window; the Translator sets the
     // application's layout direction.
+    // On phones the window reaches under the status and navigation bars;
+    // SafeArea keeps everything clear of them (zero on the desktop).
     Item {
         anchors.fill: parent
+        anchors.topMargin: window.SafeArea.margins.top
+        anchors.bottomMargin: window.SafeArea.margins.bottom
+        anchors.leftMargin: window.SafeArea.margins.left
+        anchors.rightMargin: window.SafeArea.margins.right
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
 
@@ -80,10 +101,19 @@ ApplicationWindow {
         }
 
         Hud {
+            id: hud
             anchors.top: parent.top
             anchors.topMargin: 16
             anchors.horizontalCenter: parent.horizontalCenter
             visible: window.screen === "island" || window.screen === "edit"
+        }
+
+        UpdateBanner {
+            anchors.top: hud.bottom
+            anchors.topMargin: 10
+            anchors.horizontalCenter: parent.horizontalCenter
+            visible: shown && window.screen === "island"
+            z: 50
         }
 
         // Island controls: build mode, HABITS, shop

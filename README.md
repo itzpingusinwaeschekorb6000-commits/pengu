@@ -53,3 +53,50 @@ build/pengu /tmp/test.json   # mit einem Test-Spielstand starten
 
 Neue Shop-Items: Eintrag in `src/data/items.json` + SVG in `src/sprites/`. Neue Vorlagen:
 `src/data/templates.json`. Die Roadmap und geplante Features stehen in [ROADMAP.md](ROADMAP.md).
+
+## Handy (Android) und Updates
+
+Laptop und Handy bauen aus **demselben Code**. Die wenigen Unterschiede:
+
+| Was | Wo |
+|---|---|
+| Speicherort, Sprache, Ecken | `#ifdef Q_OS_ANDROID` in `src/game.cpp`, `src/translator.cpp`, `src/theme.cpp` |
+| Erinnerungen | `src/reminders.cpp` (gleiche Regeln) + `android/src/app/pengu/island/*.java` |
+| Updates installieren | `src/updater.cpp` (Android: System-Installer, Linux: `pkexec pacman -U`) |
+| App-Name, Icon, Berechtigungen | `android/AndroidManifest.xml`, `android/res/` |
+| Layout | gleiche QML; `window.mobile` und `SafeArea` für Handy-Details |
+
+### Wie ein Update ankommt
+
+1. Code ändern, committen, `git push`.
+2. GitHub Actions (`.github/workflows/release.yml`) testet, baut `pengu.apk` und
+   `pengu-x86_64.pkg.tar.zst` und veröffentlicht beide als Release `v0.2.<Commit-Anzahl>`.
+3. Pengu prüft beim Start, alle 6 Stunden und beim Zurückkehren in die App die Datei
+   `version.json` des neuesten Releases. Ist sie neuer, erscheint **„Update verfügbar – Jetzt updaten“**.
+4. Handy: Pengu lädt die APK, Android fragt „Aktualisieren?“ → fertig, Spielstand bleibt.
+   Laptop: Pengu lädt das Paket, fragt nach dem Passwort, dann „Neu starten“.
+
+Die Versionsnummer ist `VERSION` + Anzahl der Commits, auf beiden Plattformen gleich.
+Das Repo, von dem Updates kommen, steht in `REPO`.
+
+### Android lokal bauen
+
+```sh
+bin/android-setup   # einmalig: Qt für Android, JDK, SDK/NDK nach ~/Qt und ~/Android (mehrere GB)
+bin/android-key     # einmalig: Signatur-Schlüssel in ~/.config/pengu-signing
+bin/android-build   # → build/android/pengu.apk
+~/Android/Sdk/platform-tools/adb install -r build/android/pengu.apk   # per USB aufs Handy
+```
+
+**Der Signatur-Schlüssel (`~/.config/pengu-signing`) ist wichtig:** Android installiert ein
+Update nur, wenn es mit demselben Schlüssel signiert ist. Sichere den Ordner. GitHub bekommt
+ihn als Secret (`bin/android-key --secrets` zeigt die Werte für `ANDROID_KEYSTORE_BASE64`
+und `ANDROID_KEYSTORE_PASSWORD`).
+
+### Pengu aufs Handy (für dich und Freunde)
+
+1. Auf dem Handy die Release-Seite öffnen: `https://github.com/<REPO>/releases/latest`
+2. `pengu.apk` herunterladen und öffnen. Android fragt einmal, ob der Browser Apps
+   installieren darf → erlauben.
+3. Ab dann kommen Updates über den Knopf in der App. Beim ersten Update fragt Android,
+   ob **Pengu** Apps installieren darf → erlauben.

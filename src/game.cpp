@@ -37,7 +37,13 @@ Game::~Game() {
 }
 
 QString Game::defaultSavePath() {
+#ifdef Q_OS_ANDROID
+    // The app's private storage; Android's generic data location is shared
+    // storage and needs permissions.
+    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/pengu.json";
+#else
     return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + "/pengu/pengu.json";
+#endif
 }
 
 void Game::scheduleSave() {
