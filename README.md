@@ -95,7 +95,7 @@ und `ANDROID_KEYSTORE_PASSWORD`).
 
 ### Pengu aufs Handy (für dich und Freunde)
 
-1. Auf dem Handy die Release-Seite öffnen: `https://github.com/<REPO>/releases/latest`
+1. Auf dem Handy die Release-Seite öffnen: https://github.com/itzpingusinwaeschekorb6000-commits/pengu/releases/latest
 2. `pengu.apk` herunterladen und öffnen. Android fragt einmal, ob der Browser Apps
    installieren darf → erlauben.
 3. Ab dann kommen Updates über den Knopf in der App. Beim ersten Update fragt Android,
