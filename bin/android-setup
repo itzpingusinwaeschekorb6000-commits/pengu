@@ -1,6 +1,6 @@
 #!/bin/sh
-# Installs everything needed to build the Android app into ~/Qt and
-# ~/Android (several GB, nothing system-wide): Qt for Android, JDK 17,
+# Installs everything needed to build the Android app into toolchain/
+# (several GB, nothing system-wide): Qt for Android, JDK 17,
 # the Android SDK and NDK, and KDAB's OpenSSL builds.
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"

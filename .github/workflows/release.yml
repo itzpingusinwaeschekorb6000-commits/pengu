@@ -42,8 +42,8 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: |
-            ~/Qt
-            ~/Android/android_openssl
+            toolchain/Qt
+            toolchain/android_openssl
           key: android-toolchain-${{ hashFiles('bin/android-env') }}
       - name: Toolchain
         run: bin/android-setup

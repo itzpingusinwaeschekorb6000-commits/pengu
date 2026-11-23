@@ -82,10 +82,10 @@ Das Repo, von dem Updates kommen, steht in `REPO`.
 ### Android lokal bauen
 
 ```sh
-bin/android-setup   # einmalig: Qt für Android, JDK, SDK/NDK nach ~/Qt und ~/Android (mehrere GB)
+bin/android-setup   # einmalig: Qt für Android, SDK/NDK nach toolchain/ (mehrere GB, von git ignoriert)
 bin/android-key     # einmalig: Signatur-Schlüssel in ~/.config/pengu-signing
 bin/android-build   # → build/android/pengu.apk
-~/Android/Sdk/platform-tools/adb install -r build/android/pengu.apk   # per USB aufs Handy
+toolchain/android-sdk/platform-tools/adb install -r build/android/pengu.apk   # per USB aufs Handy
 ```
 
 **Der Signatur-Schlüssel (`~/.config/pengu-signing`) ist wichtig:** Android installiert ein

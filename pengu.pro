@@ -17,7 +17,7 @@ android {
     ANDROID_TARGET_SDK_VERSION = 36
     # Qt's network stack needs OpenSSL bundled on Android (KDAB's builds).
     OPENSSL_DIR = $$(ANDROID_OPENSSL)
-    isEmpty(OPENSSL_DIR): OPENSSL_DIR = $$(HOME)/Android/android_openssl
+    isEmpty(OPENSSL_DIR): OPENSSL_DIR = $$PWD/toolchain/android_openssl
     exists($$OPENSSL_DIR/ssl_3/arm64-v8a/libssl_3.so) {
         ANDROID_EXTRA_LIBS += $$OPENSSL_DIR/ssl_3/arm64-v8a/libcrypto_3.so \
                               $$OPENSSL_DIR/ssl_3/arm64-v8a/libssl_3.so
