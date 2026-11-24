@@ -59,15 +59,21 @@ ColumnLayout {
 
     Rectangle {
         Layout.alignment: Qt.AlignHCenter
-        implicitWidth: hint.implicitWidth + 24
-        implicitHeight: hint.implicitHeight + 10
-        radius: height / 2
+        // Narrow phone screens wrap the hint instead of cutting it off.
+        Layout.maximumWidth: tray.width
+        implicitWidth: Math.min(hint.implicitWidth, tray.width - 24) + 24
+        implicitHeight: hint.height + 10
+        radius: Math.min(height / 2, 14)
         color: Qt.rgba(0.07, 0.09, 0.17, 0.8)
         Text {
             id: hint
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, tray.width - 48)
+            wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
             text: tray.view && tray.view.placing !== ""
-                  ? qsTr("Click tiles to place it. Right-click to stop.")
+                  ? (window.mobile ? qsTr("Tap tiles to place it. Tap it in the tray again to stop.")
+                                   : qsTr("Click tiles to place it. Right-click to stop."))
                   : qsTr("Tap a tile to place something. Drag to move it.")
             color: Ui.text
             font.pixelSize: 12

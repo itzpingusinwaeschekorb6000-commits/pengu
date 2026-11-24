@@ -426,6 +426,41 @@ private slots:
         QVERIFY(!Island::isBaseLand(-1, 5));
     }
 
+    void objectModelChangesOnlyWhatChanged() {
+        Catalog catalog;
+        Profile p;
+        Island island(&catalog, &p);
+        island.seed();
+        QAbstractListModel *model = island.objectModel();
+        QCOMPARE(model->rowCount(), island.objects().size());
+
+        QSignalSpy changed(model, &QAbstractItemModel::dataChanged);
+        QSignalSpy inserted(model, &QAbstractItemModel::rowsInserted);
+        QSignalSpy removed(model, &QAbstractItemModel::rowsRemoved);
+        QSignalSpy ground(&island, &Island::groundChanged);
+        const QVariantMap first = island.objects().first().toMap();
+        const int uid = first.value("uid").toInt();
+        // An empty land tile next to the camp.
+        int tx = -1, ty = -1;
+        for (int y = 10; y < 18 && tx < 0; ++y)
+            for (int x = 10; x < 18 && tx < 0; ++x)
+                if (island.isLand(x, y) && !island.objectAt(x, y)) { tx = x; ty = y; }
+        QVERIFY(tx >= 0);
+        QVERIFY(island.move(uid, tx, ty));
+        // One row changed, nothing rebuilt, and the ground stays as it is.
+        QCOMPARE(changed.size(), 1);
+        QCOMPARE(inserted.size(), 0);
+        QCOMPARE(removed.size(), 0);
+        QCOMPARE(ground.size(), 0);
+        const QModelIndex row = changed.first().first().value<QModelIndex>();
+        QCOMPARE(row.data(ObjectModel::UidRole).toInt(), uid);
+        QCOMPARE(row.data(ObjectModel::TileXRole).toInt(), tx);
+
+        QVERIFY(island.remove(uid));
+        QCOMPARE(removed.size(), 1);
+        QCOMPARE(model->rowCount(), island.objects().size());
+    }
+
     void buyingAndPlacing() {
         Catalog catalog;
         Profile p;

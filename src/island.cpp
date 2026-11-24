@@ -25,7 +25,19 @@ Island::Island(Catalog *catalog, Profile *profile, QObject *parent)
 
 void Island::touch() {
     ++m_revision;
+    QList<ObjectModel::Row> rows;
+    rows.reserve(m_objects.size());
+    for (const auto &o : m_objects)
+        if (const auto *v = m_catalog->variant(o.variant))
+            rows.append({o.uid, o.variant, o.x, o.y, o.flipped, v->sprite, v->width, v->height, v->glow,
+                         m_catalog->text(v->name)});
+    m_model.sync(rows);
     emit changed();
+}
+
+void Island::touchGround() {
+    emit groundChanged();
+    touch();
 }
 
 bool Island::isBaseLand(int x, int y) {
@@ -130,11 +142,13 @@ QString Island::canPlace(const QString &variant, int x, int y) const {
 bool Island::place(const QString &variant, int x, int y) {
     if (!canPlace(variant, x, y).isEmpty())
         return false;
-    if (!m_catalog->variant(variant)->terrain.isEmpty())
+    if (!m_catalog->variant(variant)->terrain.isEmpty()) {
         m_terrain.insert(key(x, y), variant);
-    else
+        touchGround();
+    } else {
         m_objects << Placed{m_nextUid++, variant, x, y, false};
-    touch();
+        touch();
+    }
     return true;
 }
 
@@ -184,7 +198,7 @@ QString Island::removeTerrain(int x, int y) {
     if (!isBaseLand(x, y) && objectAt(x, y))
         return "occupied";
     m_terrain.remove(key(x, y));
-    touch();
+    touchGround();
     return {};
 }
 
@@ -293,7 +307,7 @@ void Island::seed() {
         m_owned[s.variant] += 1;
         m_objects << Placed{m_nextUid++, s.variant, s.x, s.y, false};
     }
-    touch();
+    touchGround();
 }
 
 QJsonObject Island::toJson() const {
@@ -351,5 +365,5 @@ void Island::fromJson(const QJsonObject &object) {
     for (auto &o : m_objects)
         if (o.uid == 0)
             o.uid = m_nextUid++;
-    touch();
+    touchGround();
 }

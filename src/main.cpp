@@ -6,6 +6,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
+#include <QSurfaceFormat>
 #include <QUrl>
 
 #include "game.h"
@@ -15,6 +16,12 @@
 #include "updater.h"
 
 int main(int argc, char *argv[]) {
+    // The island ground is drawn as GPU triangles; multisampling smooths
+    // their diagonal edges.
+    QSurfaceFormat format = QSurfaceFormat::defaultFormat();
+    format.setSamples(4);
+    QSurfaceFormat::setDefaultFormat(format);
+
     QGuiApplication app(argc, argv);
     app.setApplicationName("pengu");
     app.setApplicationVersion(PENGU_VERSION);

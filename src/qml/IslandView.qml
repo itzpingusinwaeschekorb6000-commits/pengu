@@ -51,6 +51,26 @@ Item {
         return tiles.tileAt((px - world.x) / zoom, (py - world.y) / zoom)
     }
 
+    // The object whose picture is under a point, frontmost first; on a phone
+    // a finger lands on a tree's crown, not on the tile it stands on. Falls
+    // back to the object on the tile.
+    function objectAtView(px, py) {
+        const wx = (px - world.x) / zoom, wy = (py - world.y) / zoom
+        let best = null
+        for (let i = 0; i < objects.count; ++i) {
+            const o = objects.itemAt(i)
+            // Sprites have some empty margin; only the middle counts.
+            if (o && wx >= o.x + o.width * 0.12 && wx <= o.x + o.width * 0.88
+                    && wy >= o.y + o.height * 0.08 && wy <= o.y + o.height
+                    && (!best || o.z > best.z))
+                best = o
+        }
+        if (best)
+            return best.uid
+        const t = tileAtView(px, py)
+        return t.x >= 0 ? island.objectAt(t.x, t.y) : 0
+    }
+
     Component.onCompleted: Qt.callLater(centerOnIsland)
 
     Rectangle {
@@ -74,26 +94,26 @@ Item {
             height: implicitHeight
             z: 0
             showGrid: true
-            // Paint at screen resolution so lines stay sharp when zoomed in.
-            textureSize: Qt.size(Math.min(8192, Math.ceil(width * view.zoom * Screen.devicePixelRatio)),
-                                 Math.min(8192, Math.ceil(height * view.zoom * Screen.devicePixelRatio)))
         }
 
         // Warm light on the ground around fires, torches and lamps.
         Repeater {
-            model: island.objects
+            model: island.objectModel
             delegate: Image {
-                required property var modelData
-                visible: modelData.glow
-                readonly property point c: tiles.tileCenter(modelData.x, modelData.y)
+                required property bool glow
+                required property int tileX
+                required property int tileY
+                visible: glow
+                readonly property point c: tiles.tileCenter(tileX, tileY)
                 width: 150
                 height: 75
                 x: c.x - width / 2
                 y: c.y - height / 2
                 z: 1
-                source: "qrc:/sprites/glow.svg"
+                source: glow ? "qrc:/sprites/glow.svg" : ""
                 sourceSize: Qt.size(200, 100)
                 SequentialAnimation on opacity {
+                    running: visible
                     loops: Animation.Infinite
                     NumberAnimation { to: 0.8; duration: 900 + Math.random() * 400; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 1.0; duration: 900 + Math.random() * 400; easing.type: Easing.InOutSine }
@@ -101,26 +121,36 @@ Item {
             }
         }
 
+        // Placed objects. The model changes row by row, so moving one object
+        // only moves its item; the others (and their sprites) stay.
         Repeater {
-            model: island.objects
+            id: objects
+            model: island.objectModel
             delegate: Item {
                 id: placed
-                required property var modelData
-                readonly property point c: tiles.tileCenter(modelData.x, modelData.y)
-                readonly property bool selected: view.editing && view.selectedUid === modelData.uid
-                readonly property bool dragging: dragger.uid === modelData.uid
-                width: modelData.width
-                height: modelData.height
+                required property int uid
+                required property int tileX
+                required property int tileY
+                required property string sprite
+                required property real spriteWidth
+                required property real spriteHeight
+                required property bool flipped
+                readonly property point c: tiles.tileCenter(tileX, tileY)
+                readonly property bool selected: view.editing && view.selectedUid === uid
+                readonly property bool dragging: dragger.uid === uid
+                width: spriteWidth
+                height: spriteHeight
                 x: (dragging ? dragger.pos.x : c.x) - width / 2
                 y: (dragging ? dragger.pos.y : c.y) - height + 4
-                z: 10 + (modelData.x + modelData.y) * 10 + (dragging ? 500 : 0)
+                z: 10 + (tileX + tileY) * 10 + (dragging ? 500 : 0)
                 opacity: dragging ? 0.75 : 1
 
                 Image {
                     anchors.fill: parent
-                    source: "qrc:/sprites/" + placed.modelData.sprite
+                    source: "qrc:/sprites/" + placed.sprite
                     sourceSize: Qt.size(placed.width * 3, placed.height * 3)
-                    mirror: placed.modelData.flipped
+                    asynchronous: true
+                    mirror: placed.flipped
                     smooth: true
                     mipmap: true
                 }
@@ -162,6 +192,9 @@ Item {
         property real pressCamY
         property bool movedFar: false
         property int pressUid: 0
+        // Fingers hide what they drag, so on touch the object rides this far
+        // above the finger, and it lands on the tile under itself.
+        property real lift: 0
 
         onPressed: (e) => {
             pressPos = Qt.point(e.x, e.y)
@@ -169,21 +202,31 @@ Item {
             pressCamY = view.camY
             movedFar = false
             pressUid = 0
-            if (view.editing && e.button === Qt.LeftButton && view.placing === "") {
-                const t = view.tileAtView(e.x, e.y)
-                if (t.x >= 0)
-                    pressUid = island.objectAt(t.x, t.y)
-            }
+            lift = e.source === Qt.MouseEventSynthesizedByQt || e.source === Qt.MouseEventSynthesizedBySystem ? 56 : 0
+            if (view.editing && e.button === Qt.LeftButton && view.placing === "")
+                pressUid = view.objectAtView(e.x, e.y)
         }
         onPositionChanged: (e) => {
-            if (view.editing) {
+            // Placing: the tile under the pointer shows whether it fits. Only
+            // ask the island again when the pointer reaches another tile.
+            if (view.editing && view.placing !== "" && !dragger.uid) {
                 const t = view.tileAtView(e.x, e.y)
-                tiles.highlight = (view.placing !== "" || dragger.uid) ? t : Qt.point(-1, -1)
-                if (view.placing !== "")
+                if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
+                    tiles.highlight = t
                     tiles.highlightOk = t.x >= 0 && island.canPlace(view.placing, t.x, t.y) === ""
+                }
             }
             if (!pressed)
                 return
+            if (pinch.active) {
+                // Two fingers zoom; the first one must not pan meanwhile,
+                // and panning resumes from here without a jump.
+                pressPos = Qt.point(e.x, e.y)
+                pressCamX = view.camX
+                pressCamY = view.camY
+                movedFar = true
+                return
+            }
             if (Math.abs(e.x - pressPos.x) + Math.abs(e.y - pressPos.y) > 5)
                 movedFar = true
             if (!movedFar)
@@ -192,11 +235,13 @@ Item {
                 // Dragging a placed object.
                 dragger.uid = pressUid
                 view.selectedUid = pressUid
-                const t = view.tileAtView(e.x, e.y)
-                dragger.pos = Qt.point((e.x - world.x) / view.zoom, (e.y - world.y) / view.zoom + 10)
-                tiles.highlight = t
-                tiles.highlightOk = t.x >= 0 && island.isLand(t.x, t.y)
-                    && (island.objectAt(t.x, t.y) === 0 || island.objectAt(t.x, t.y) === pressUid)
+                const t = view.tileAtView(e.x, e.y - lift)
+                dragger.pos = Qt.point((e.x - world.x) / view.zoom, (e.y - lift - world.y) / view.zoom + 10)
+                if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
+                    tiles.highlight = t
+                    const there = t.x >= 0 ? island.objectAt(t.x, t.y) : 0
+                    tiles.highlightOk = t.x >= 0 && island.isLand(t.x, t.y) && (there === 0 || there === pressUid)
+                }
                 return
             }
             view.camX = pressCamX - (e.x - pressPos.x) / view.zoom
@@ -204,7 +249,7 @@ Item {
             view.clampCamera()
         }
         onReleased: (e) => {
-            const t = view.tileAtView(e.x, e.y)
+            const t = view.tileAtView(e.x, e.y - (dragger.uid ? lift : 0))
             if (dragger.uid) {
                 if (t.x >= 0 && !island.move(dragger.uid, t.x, t.y))
                     view.placeFailed("occupied")
@@ -247,6 +292,7 @@ Item {
     }
 
     PinchHandler {
+        id: pinch
         target: null
         property real last: 1
         onActiveChanged: last = 1

@@ -200,5 +200,6 @@
  "The download was damaged. Please try again.": "Der Download ist beschädigt. Bitte nochmal versuchen.",
  "Could not save the update: %1": "Das Update konnte nicht gespeichert werden: %1",
  "Android did not open the installer.": "Android hat den Installer nicht geöffnet.",
- "Enabled. Pengu reminds you even when the app is closed.": "Aktiviert. Pengu erinnert dich auch, wenn die App geschlossen ist."
+ "Enabled. Pengu reminds you even when the app is closed.": "Aktiviert. Pengu erinnert dich auch, wenn die App geschlossen ist.",
+ "Tap tiles to place it. Tap it in the tray again to stop.": "Tippe auf Felder zum Platzieren. Nochmal in der Leiste antippen beendet."
 }

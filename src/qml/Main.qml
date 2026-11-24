@@ -12,7 +12,9 @@ ApplicationWindow {
     minimumHeight: mobile ? 0 : 560
     visible: true
     title: "Pengu"
-    color: Ui.bg
+    // Behind the phone's status and navigation bars: sea on the island,
+    // the page color elsewhere.
+    color: screen === "island" || screen === "edit" ? "#2a4cb8" : Ui.bg
 
     Material.theme: Material.Dark
     Material.accent: theme.accent
@@ -246,7 +248,7 @@ ApplicationWindow {
                 wrapMode: Text.Wrap
                 font.pixelSize: 13
             }
-            CircleButton { id: closeProblem; glyph: "✕"; width: 28; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; fill: "#7a2a2a"; onClicked: parent.dismissed = true }
+            CircleButton { id: closeProblem; symbol: "close"; width: 28; anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter; fill: "#7a2a2a"; onClicked: parent.dismissed = true }
         }
 
         HelpOverlay {

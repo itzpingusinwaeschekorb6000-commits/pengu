@@ -8,6 +8,7 @@ HEADERS += \
     $$PWD/game.h \
     $$PWD/habits.h \
     $$PWD/island.h \
+    $$PWD/objectmodel.h \
     $$PWD/profile.h \
     $$PWD/reminders.h \
     $$PWD/theme.h \
@@ -20,6 +21,7 @@ SOURCES += \
     $$PWD/game.cpp \
     $$PWD/habits.cpp \
     $$PWD/island.cpp \
+    $$PWD/objectmodel.cpp \
     $$PWD/profile.cpp \
     $$PWD/reminders.cpp \
     $$PWD/theme.cpp \

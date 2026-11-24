@@ -69,7 +69,7 @@ Rectangle {
                 color: Ui.card
                 FishAmount { id: balance; anchors.centerIn: parent; amount: profile.fish }
             }
-            CircleButton { glyph: "✕"; width: 34; fill: Ui.card; tooltip: qsTr("Close (Esc)"); onClicked: shop.close() }
+            CircleButton { symbol: "close"; width: 34; fill: Ui.card; tooltip: qsTr("Close (Esc)"); onClicked: shop.close() }
         }
 
         // Back link on variant pages
@@ -106,7 +106,8 @@ Rectangle {
                 spacing: 10
                 PillButton {
                     Layout.fillWidth: true
-                    text: qsTr("Sort: %1").arg(shop.sortNames[shop.sort]) + "  ▾"
+                    text: qsTr("Sort: %1").arg(shop.sortNames[shop.sort])
+                    symbol: "down"
                     fill: Ui.card
                     fontSize: 13
                     onClicked: sortMenu.open()

@@ -45,7 +45,7 @@ Rectangle {
 
             RowLayout {
                 Item { Layout.fillWidth: true }
-                CircleButton { glyph: "✕"; width: 34; fill: Ui.card; tooltip: qsTr("Back to the island (Esc)"); onClicked: page.close() }
+                CircleButton { symbol: "close"; width: 34; fill: Ui.card; tooltip: qsTr("Back to the island (Esc)"); onClicked: page.close() }
             }
 
             RowLayout {
@@ -162,12 +162,15 @@ Rectangle {
                         color: Ui.dim
                         font.pixelSize: 13
                     }
-                    Text {
+                    Icon {
                         anchors.right: parent.right
                         anchors.rightMargin: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        text: sec.hiddenCards ? "▾" : "▴"
+                        width: 12
+                        height: 12
+                        name: sec.hiddenCards ? "down" : "up"
                         color: Ui.dim
+                        lineWidth: 2
                     }
                     MouseArea {
                         anchors.fill: parent
@@ -288,7 +291,7 @@ Rectangle {
         CircleButton {
             anchors.right: parent.right
             width: 54
-            glyph: page.fabOpen ? "✕" : "+"
+            symbol: page.fabOpen ? "close" : "plus"
             fill: page.fabOpen ? Ui.gray : Ui.green
             glyphColor: "#10200c"
             tooltip: qsTr("New habit (N)")

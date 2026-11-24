@@ -67,11 +67,13 @@ Rectangle {
             }
             Rectangle { width: 1; height: 20; color: Qt.rgba(1, 1, 1, 0.2); anchors.verticalCenter: parent.verticalCenter }
             FishAmount { amount: profile.fish; size: 13; anchors.verticalCenter: parent.verticalCenter }
-            Text {
+            Icon {
                 anchors.verticalCenter: parent.verticalCenter
-                text: hud.expanded ? "▴" : "▾"
+                width: 10
+                height: 10
+                name: hud.expanded ? "up" : "down"
                 color: Ui.dim
-                font.pixelSize: 12
+                lineWidth: 1.8
             }
         }
 
@@ -85,7 +87,11 @@ Rectangle {
                 spacing: 28
                 ColumnLayout {
                     spacing: 0
-                    Text { text: "● " + hud.today.done + "/" + hud.today.scheduled; color: Ui.text; font.bold: true; font.pixelSize: 14 }
+                    Row {
+                        spacing: 6
+                        Rectangle { width: 8; height: 8; radius: 4; color: Ui.text; anchors.verticalCenter: parent.verticalCenter }
+                        Text { text: hud.today.done + "/" + hud.today.scheduled; color: Ui.text; font.bold: true; font.pixelSize: 14 }
+                    }
                     Text { text: qsTr("habits"); color: Ui.dim; font.pixelSize: 11 }
                 }
                 ColumnLayout {

@@ -1,10 +1,12 @@
 import QtQuick
 
-// A round button with an icon (sprite) or a glyph.
+// A round button with an icon (sprite), a vector symbol (see Icon.qml) or a
+// text glyph.
 Rectangle {
     id: root
     property string icon: ""
     property string glyph: ""
+    property string symbol: ""
     property color fill: Ui.cardHi
     property color glyphColor: Ui.text
     property string tooltip: ""
@@ -22,6 +24,15 @@ Rectangle {
         height: width
         source: root.icon ? "qrc:/sprites/" + root.icon : ""
         sourceSize: Qt.size(width * 2, height * 2)
+    }
+    Icon {
+        visible: root.symbol !== ""
+        anchors.centerIn: parent
+        width: parent.width * 0.42
+        height: width
+        name: root.symbol
+        color: root.glyphColor
+        lineWidth: Math.max(2, root.width / 16)
     }
     Text {
         visible: root.glyph !== ""
