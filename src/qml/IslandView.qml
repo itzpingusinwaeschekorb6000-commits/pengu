@@ -180,13 +180,11 @@ Item {
         property point pos: Qt.point(0, 0)
     }
 
-    MouseArea {
-        id: mouse
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        preventStealing: true
-
+    // One pointer, the mouse or a single finger: dragging pans the island;
+    // in build mode a click places or selects, and dragging a placed object
+    // moves it. The mouse area and the touch area below both feed these.
+    QtObject {
+        id: pointer
         property point pressPos
         property real pressCamX
         property real pressCamY
@@ -195,105 +193,219 @@ Item {
         // Fingers hide what they drag, so on touch the object rides this far
         // above the finger, and it lands on the tile under itself.
         property real lift: 0
-
-        onPressed: (e) => {
-            pressPos = Qt.point(e.x, e.y)
-            pressCamX = view.camX
-            pressCamY = view.camY
-            movedFar = false
-            pressUid = 0
-            lift = e.source === Qt.MouseEventSynthesizedByQt || e.source === Qt.MouseEventSynthesizedBySystem ? 56 : 0
-            if (view.editing && e.button === Qt.LeftButton && view.placing === "")
-                pressUid = view.objectAtView(e.x, e.y)
-        }
-        onPositionChanged: (e) => {
-            // Placing: the tile under the pointer shows whether it fits. Only
-            // ask the island again when the pointer reaches another tile.
-            if (view.editing && view.placing !== "" && !dragger.uid) {
-                const t = view.tileAtView(e.x, e.y)
-                if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
-                    tiles.highlight = t
-                    tiles.highlightOk = t.x >= 0 && island.canPlace(view.placing, t.x, t.y) === ""
-                }
-            }
-            if (!pressed)
-                return
-            if (pinch.active) {
-                // Two fingers zoom; the first one must not pan meanwhile,
-                // and panning resumes from here without a jump.
-                pressPos = Qt.point(e.x, e.y)
-                pressCamX = view.camX
-                pressCamY = view.camY
-                movedFar = true
-                return
-            }
-            if (Math.abs(e.x - pressPos.x) + Math.abs(e.y - pressPos.y) > 5)
-                movedFar = true
-            if (!movedFar)
-                return
-            if (pressUid) {
-                // Dragging a placed object.
-                dragger.uid = pressUid
-                view.selectedUid = pressUid
-                const t = view.tileAtView(e.x, e.y - lift)
-                dragger.pos = Qt.point((e.x - world.x) / view.zoom, (e.y - lift - world.y) / view.zoom + 10)
-                if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
-                    tiles.highlight = t
-                    const there = t.x >= 0 ? island.objectAt(t.x, t.y) : 0
-                    tiles.highlightOk = t.x >= 0 && island.isLand(t.x, t.y) && (there === 0 || there === pressUid)
-                }
-                return
-            }
-            view.camX = pressCamX - (e.x - pressPos.x) / view.zoom
-            view.camY = pressCamY - (e.y - pressPos.y) / view.zoom
-            view.clampCamera()
-        }
-        onReleased: (e) => {
-            const t = view.tileAtView(e.x, e.y - (dragger.uid ? lift : 0))
-            if (dragger.uid) {
-                if (t.x >= 0 && !island.move(dragger.uid, t.x, t.y))
-                    view.placeFailed("occupied")
-                dragger.uid = 0
-                tiles.highlight = Qt.point(-1, -1)
-                view.moved()
-                return
-            }
-            if (movedFar || !view.editing || t.x < 0)
-                return
-            if (e.button === Qt.RightButton) {
-                view.placing = ""
-                view.clearSelection()
-                return
-            }
-            if (view.placing !== "") {
-                const reason = island.canPlace(view.placing, t.x, t.y)
-                if (reason !== "" || !island.place(view.placing, t.x, t.y)) {
-                    view.placeFailed(reason)
-                    if (reason === "none" || reason === "unknown")
-                        view.placing = ""
-                    return
-                }
-                if (island.available(view.placing) <= 0)
-                    view.placing = ""
-                tiles.highlightOk = view.placing !== "" && island.canPlace(view.placing, t.x, t.y) === ""
-                return
-            }
-            const uid = island.objectAt(t.x, t.y)
-            view.clearSelection()
-            if (uid)
-                view.selectedUid = uid
-            else if (island.terrainAt(t.x, t.y) !== "")
-                view.selectedTile = t
-        }
-        onExited: tiles.highlight = Qt.point(-1, -1)
-        onWheel: (w) => view.zoomBy(Math.pow(1.0015, w.angleDelta.y), w.x, w.y)
-        cursorShape: view.editing && (view.placing !== "" || containsMouse && pressUid) ? Qt.PointingHandCursor
-                   : pressed && movedFar ? Qt.ClosedHandCursor : Qt.ArrowCursor
     }
 
+    function pointerPressed(px, py, finger, leftButton) {
+        pointer.pressPos = Qt.point(px, py)
+        pointer.pressCamX = camX
+        pointer.pressCamY = camY
+        pointer.movedFar = false
+        pointer.pressUid = 0
+        pointer.lift = finger ? 56 : 0
+        if (editing && leftButton && placing === "")
+            pointer.pressUid = objectAtView(px, py)
+    }
+
+    // Placing: the tile under the pointer shows whether it fits. Only ask
+    // the island again when the pointer reaches another tile.
+    function pointerHover(px, py) {
+        if (!editing || placing === "" || dragger.uid)
+            return
+        const t = tileAtView(px, py)
+        if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
+            tiles.highlight = t
+            tiles.highlightOk = t.x >= 0 && island.canPlace(placing, t.x, t.y) === ""
+        }
+    }
+
+    function pointerMoved(px, py) {
+        if (Math.abs(px - pointer.pressPos.x) + Math.abs(py - pointer.pressPos.y) > 5)
+            pointer.movedFar = true
+        if (!pointer.movedFar)
+            return
+        if (pointer.pressUid) {
+            // Dragging a placed object.
+            dragger.uid = pointer.pressUid
+            selectedUid = pointer.pressUid
+            const t = tileAtView(px, py - pointer.lift)
+            dragger.pos = Qt.point((px - world.x) / zoom, (py - pointer.lift - world.y) / zoom + 10)
+            if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
+                tiles.highlight = t
+                const there = t.x >= 0 ? island.objectAt(t.x, t.y) : 0
+                tiles.highlightOk = t.x >= 0 && island.isLand(t.x, t.y) && (there === 0 || there === pointer.pressUid)
+            }
+            return
+        }
+        camX = pointer.pressCamX - (px - pointer.pressPos.x) / zoom
+        camY = pointer.pressCamY - (py - pointer.pressPos.y) / zoom
+        clampCamera()
+    }
+
+    function pointerReleased(px, py, rightButton) {
+        const t = tileAtView(px, py - (dragger.uid ? pointer.lift : 0))
+        if (dragger.uid) {
+            if (t.x >= 0 && !island.move(dragger.uid, t.x, t.y))
+                placeFailed("occupied")
+            dragger.uid = 0
+            tiles.highlight = Qt.point(-1, -1)
+            moved()
+            return
+        }
+        if (pointer.movedFar || !editing || t.x < 0)
+            return
+        if (rightButton) {
+            placing = ""
+            clearSelection()
+            return
+        }
+        if (placing !== "") {
+            const reason = island.canPlace(placing, t.x, t.y)
+            if (reason !== "" || !island.place(placing, t.x, t.y)) {
+                placeFailed(reason)
+                if (reason === "none" || reason === "unknown")
+                    placing = ""
+                return
+            }
+            if (island.available(placing) <= 0)
+                placing = ""
+            tiles.highlightOk = placing !== "" && island.canPlace(placing, t.x, t.y) === ""
+            return
+        }
+        const uid = island.objectAt(t.x, t.y)
+        clearSelection()
+        if (uid)
+            selectedUid = uid
+        else if (island.terrainAt(t.x, t.y) !== "")
+            selectedTile = t
+    }
+
+    // The gesture stopped without a release of its own (a second finger
+    // came, or the system took the touch): a dragged object goes back to
+    // its tile, and nothing counts as a click.
+    function pointerCanceled() {
+        if (dragger.uid) {
+            dragger.uid = 0
+            tiles.highlight = Qt.point(-1, -1)
+        }
+        pointer.pressUid = 0
+        pointer.movedFar = true
+    }
+
+    MouseArea {
+        id: mouse
+        anchors.fill: parent
+        hoverEnabled: true
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+        onPressed: (e) => view.pointerPressed(e.x, e.y, false, e.button === Qt.LeftButton)
+        onPositionChanged: (e) => {
+            view.pointerHover(e.x, e.y)
+            if (pressed)
+                view.pointerMoved(e.x, e.y)
+        }
+        onReleased: (e) => view.pointerReleased(e.x, e.y, e.button === Qt.RightButton)
+        onCanceled: view.pointerCanceled()
+        onExited: tiles.highlight = Qt.point(-1, -1)
+        onWheel: (w) => view.zoomBy(Math.pow(1.0015, w.angleDelta.y), w.x, w.y)
+        cursorShape: view.editing && (view.placing !== "" || containsMouse && pointer.pressUid) ? Qt.PointingHandCursor
+                   : pressed && pointer.movedFar ? Qt.ClosedHandCursor : Qt.ArrowCursor
+    }
+
+    // Fingers on a touch screen. One finger works like the mouse. Two
+    // fingers zoom, and the spot between them stays between them, so the
+    // island follows the hand like a photo. This area takes the touches
+    // itself: left to the mouse area, Qt turned both fingers into one
+    // jumping mouse pointer. Mouse and wheel pass through to it below.
+    MultiPointTouchArea {
+        id: touch
+        anchors.fill: parent
+        mouseEnabled: false
+        touchPoints: [
+            TouchPoint { id: finger1 },
+            TouchPoint { id: finger2 }
+        ]
+
+        property int fingers: 0           // Fingers in use: 0, 1 or 2.
+        property var single: null         // The finger of a one-finger gesture.
+        property real startDistance: 1
+        property real startZoom: 1
+        property point anchor             // World point held between two fingers.
+
+        function spread() {
+            return Math.max(1, Math.hypot(finger2.x - finger1.x, finger2.y - finger1.y))
+        }
+
+        function startPinch() {
+            view.pointerCanceled()
+            startDistance = spread()
+            startZoom = view.zoom
+            const cx = (finger1.x + finger2.x) / 2, cy = (finger1.y + finger2.y) / 2
+            anchor = Qt.point((cx - world.x) / view.zoom, (cy - world.y) / view.zoom)
+        }
+
+        function followPinch() {
+            const d = spread()
+            const wanted = startZoom * d / startDistance
+            const next = Math.max(view.minZoom, Math.min(view.maxZoom, wanted))
+            // At the zoom limit: start over from here, so turning back
+            // zooms at once instead of after undoing the extra spread.
+            if (next !== wanted) {
+                startZoom = next
+                startDistance = d
+            }
+            const cx = (finger1.x + finger2.x) / 2, cy = (finger1.y + finger2.y) / 2
+            view.zoom = next
+            view.camX = anchor.x - (cx - view.width / 2) / next
+            view.camY = anchor.y - (cy - view.height / 2) / next
+            view.clampCamera()
+        }
+
+        function track() {
+            const down = [finger1, finger2].filter((f) => f.pressed)
+            const was = fingers
+            fingers = down.length
+            if (fingers === 2) {
+                if (was === 2)
+                    followPinch()
+                else
+                    startPinch()
+            } else if (fingers === 1) {
+                const f = down[0]
+                if (was === 0) {
+                    view.pointerPressed(f.x, f.y, true, true)
+                } else if (was === 2 || f !== single) {
+                    // A finger of the pinch lifted: the other one pans on
+                    // from here, without a jump.
+                    view.pointerPressed(f.x, f.y, true, false)
+                    view.pointerCanceled()
+                } else {
+                    view.pointerHover(f.x, f.y)
+                    view.pointerMoved(f.x, f.y)
+                }
+                single = f
+            } else {
+                if (was === 1 && single)
+                    view.pointerReleased(single.x, single.y, false)
+                single = null
+            }
+        }
+
+        onPressed: track()
+        onUpdated: track()
+        onReleased: track()
+        onCanceled: {
+            fingers = 0
+            single = null
+            view.pointerCanceled()
+        }
+    }
+
+    // Touchpad pinch on the laptop. A touch screen's fingers go to the touch
+    // area above instead.
     PinchHandler {
         id: pinch
         target: null
+        acceptedDevices: PointerDevice.AllDevices & ~PointerDevice.TouchScreen
         property real last: 1
         onActiveChanged: last = 1
         onActiveScaleChanged: {
