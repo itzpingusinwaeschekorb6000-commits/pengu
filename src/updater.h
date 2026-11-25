@@ -7,6 +7,9 @@
 #include <QProcess>
 #include <QTimer>
 
+// PENGU_BUILD, PENGU_VERSION and PENGU_REPO, written by qmake (sources.pri).
+#include "pengu_version.h"
+
 class QNetworkReply;
 
 // Finds newer builds on the project's GitHub releases and installs them:
@@ -16,7 +19,7 @@ class QNetworkReply;
 // Every release carries a version.json next to its files:
 //   { "build": 42, "version": "0.2.42", "notes": "...",
 //     "assets": { "android": { "file": "pengu.apk", "sha256": "..." },
-//                 "linux":   { "file": "pengu-x86_64.pkg.tar.zst", "sha256": "..." } } }
+//                 "linux":   { "file": "pengu-x86_64.pkg.tar.zst", "sha256": "...", "qt": "6.12" } } }
 class Updater : public QObject {
     Q_OBJECT
     Q_PROPERTY(QString version READ version CONSTANT)
@@ -54,6 +57,7 @@ public:
     // Which entry of version.json's "assets" this build installs.
     static QString platformKey();
     // Parses version.json; false when it is unusable or has no file for us.
+    // A release built for a newer Qt than this system has is left out.
     bool parseRelease(const QByteArray &json);
 
 signals:
@@ -70,6 +74,9 @@ private:
     bool m_supported = false;
     QString m_state = "idle";
     QString m_latestVersion, m_notes, m_error, m_file, m_sha256;
+    // The checked download of m_latestBuild, for another try without
+    // downloading it again.
+    QString m_readyFile;
     int m_latestBuild = 0;
     double m_progress = 0;
     QDateTime m_lastCheck;

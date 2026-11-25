@@ -22,6 +22,8 @@ ColumnLayout {
         return null
     }
     readonly property bool terrainSelected: view && view.selectedTile.x >= 0
+    // The list is not rebuilt when the new category has as many entries.
+    onCategoryChanged: list.positionViewAtBeginning()
 
     RowLayout {
         Layout.alignment: Qt.AlignHCenter
@@ -51,7 +53,8 @@ ColumnLayout {
 
     PillButton {
         Layout.alignment: Qt.AlignHCenter
-        text: qsTr("Done")
+        // Not "Done": that is the habit wording (German "Erledigt").
+        text: qsTr("Finish")
         fill: Ui.green
         textColor: "#10200c"
         onClicked: tray.done()
@@ -74,7 +77,8 @@ ColumnLayout {
             text: tray.view && tray.view.placing !== ""
                   ? (window.mobile ? qsTr("Tap tiles to place it. Tap it in the tray again to stop.")
                                    : qsTr("Click tiles to place it. Right-click to stop."))
-                  : qsTr("Tap a tile to place something. Drag to move it.")
+                  : (window.mobile ? qsTr("Pick something below, then tap a tile. Drag things to move them.")
+                                   : qsTr("Pick something below, then click a tile. Drag things to move them."))
             color: Ui.text
             font.pixelSize: 12
         }
@@ -97,12 +101,23 @@ ColumnLayout {
             spacing: 6
             clip: true
             boundsBehavior: Flickable.StopAtBounds
-            readonly property var inventory: tray.category === "" ? [] : island.inventory(tray.category, island.revision)
-            model: tray.category === "" ? catalog.trayCategories() : [{ back: true }].concat(inventory)
+            // Indexes into a plain array: placing or moving something builds a
+            // new array, and only a different length rebuilds the cells (and
+            // scrolls back to the start).
+            readonly property var entries: {
+                catalog.language // Names follow a language switch.
+                return tray.category === "" ? catalog.trayCategories()
+                                            : [{ back: true }].concat(island.inventory(tray.category, island.revision))
+            }
+            readonly property var trayInfo: catalog.trayCategories().find(t => t.id === tray.category) || ({})
+            model: entries.length
 
             delegate: Rectangle {
                 id: del
-                required property var modelData
+                required property int index
+                readonly property var modelData: list.entries[index] || ({})
+                // The Back cell shows its tray's picture, faded.
+                readonly property var art: isBack ? list.trayInfo : modelData
                 readonly property bool isBack: !!modelData.back
                 readonly property bool isCategory: tray.category === ""
                 readonly property bool active: !isCategory && !isBack && tray.view.placing === modelData.variant
@@ -112,24 +127,23 @@ ColumnLayout {
                 color: active ? Qt.rgba(0.5, 0.83, 0.43, 0.35) : cell.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.04)
 
                 Item {
-                    id: art
+                    // Short enough to leave room for a two-line name below.
                     anchors.top: parent.top
-                    anchors.topMargin: 6
+                    anchors.topMargin: 4
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: 40; height: 38
+                    width: 40; height: 34
+                    opacity: del.isBack ? 0.5 : 1
                     Image {
                         anchors.fill: parent
                         fillMode: Image.PreserveAspectFit
                         visible: source != ""
-                        source: del.isBack ? "qrc:/sprites/" + (catalog.trayCategories().find(t => t.id === tray.category) || {}).sprite
-                              : (del.modelData.sprite ? "qrc:/sprites/" + del.modelData.sprite : "")
-                        sourceSize: Qt.size(80, 76)
-                        opacity: del.isBack ? 0.5 : 1
+                        source: del.art.sprite ? "qrc:/sprites/" + del.art.sprite : ""
+                        sourceSize: Qt.size(80, 68)
                     }
                     TerrainSwatch {
                         anchors.centerIn: parent
-                        visible: !del.isBack && !!del.modelData.terrain
-                        kind: del.modelData.terrain || ""
+                        visible: !!del.art.terrain
+                        kind: del.art.terrain || ""
                         width: 40; height: 20
                     }
                 }
@@ -178,7 +192,7 @@ ColumnLayout {
 
             // Nothing of this kind owned yet.
             Row {
-                visible: tray.category !== "" && list.inventory.length === 0
+                visible: tray.category !== "" && list.entries.length <= 1
                 x: 86
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: 12

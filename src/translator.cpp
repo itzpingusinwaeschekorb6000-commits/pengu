@@ -9,6 +9,10 @@
 #include <QLocale>
 #include <QRegularExpression>
 
+#ifdef Q_OS_ANDROID
+#include <QJniObject>
+#endif
+
 Translator::Translator(const QString &languageFile, const QString &catalogDirectory, QObject *parent)
     : QTranslator(parent),
       m_languageFile(languageFile.isEmpty() ? QDir::homePath() + "/.config/omarchy/language" : languageFile),
@@ -18,6 +22,13 @@ Translator::Translator(const QString &languageFile, const QString &catalogDirect
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this] { m_debounce.start(); });
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this] { m_debounce.start(); });
     connect(&m_debounce, &QTimer::timeout, this, &Translator::reload);
+#ifdef Q_OS_ANDROID
+    // The phone's language can change while Pengu waits in the background.
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state == Qt::ApplicationActive)
+            reload();
+    });
+#endif
     reload();
 }
 
@@ -107,8 +118,11 @@ void Translator::reload() {
 
     // Catalogs are compiled in, so only a different language needs a reload.
 #ifdef Q_OS_ANDROID
-    // No Omarchy on the phone: follow the system language.
-    const QString language = QLocale::system().name().section('_', 0, 0);
+    // No Omarchy on the phone: follow the system language. Java's default
+    // locale also follows a change made while Pengu runs.
+    const QString language = QJniObject::callStaticObjectMethod("java/util/Locale", "getDefault", "()Ljava/util/Locale;")
+                                 .callObjectMethod("toLanguageTag", "()Ljava/lang/String;")
+                                 .toString().section('-', 0, 0);
 #else
     const QString language = readLanguage(m_languageFile);
 #endif

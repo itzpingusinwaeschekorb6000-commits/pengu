@@ -7,14 +7,12 @@ Rectangle {
     id: banner
     readonly property string state_: updater.state
     readonly property bool busy: state_ === "downloading" || state_ === "installing"
-    readonly property bool shown: !dismissed && ["available", "downloading", "installing", "restart", "error"].indexOf(state_) >= 0
-    property bool dismissed: false
-
-    // A new release, or a new attempt, shows the banner again.
-    Connections {
-        target: updater
-        function onChanged() { if (updater.state !== "available") banner.dismissed = false }
-    }
+    // Closing hides the banner until there is news: another release, the
+    // restart prompt or a different error.
+    readonly property string key: state_ + "|" + updater.latestVersion + "|" + updater.error
+    property string dismissedKey: ""
+    readonly property bool shown: ["available", "downloading", "installing", "restart", "error"].indexOf(state_) >= 0
+                                  && (busy || dismissedKey !== key)
 
     visible: shown
     width: Math.min(parent ? parent.width - 32 : 420, 440)
@@ -55,6 +53,9 @@ Rectangle {
                     color: Ui.text
                     font.pixelSize: 15
                     font.bold: true
+                    // Long German titles wrap next to a wide button.
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
                     elide: Text.ElideRight
                 }
                 Text {
@@ -66,7 +67,7 @@ Rectangle {
                     color: Ui.dim
                     font.pixelSize: 12
                     wrapMode: Text.Wrap
-                    maximumLineCount: 2
+                    maximumLineCount: 3
                     elide: Text.ElideRight
                 }
             }
@@ -80,7 +81,7 @@ Rectangle {
                 onClicked: banner.state_ === "restart" ? updater.restart() : updater.install()
             }
             Text {
-                visible: banner.state_ === "available"
+                visible: !banner.busy
                 text: "×"
                 color: Ui.dim
                 font.pixelSize: 22
@@ -89,7 +90,7 @@ Rectangle {
                     anchors.fill: parent
                     anchors.margins: -10
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: banner.dismissed = true
+                    onClicked: banner.dismissedKey = banner.key
                 }
             }
         }

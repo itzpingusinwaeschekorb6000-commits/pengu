@@ -44,6 +44,9 @@ int main(int argc, char *argv[]) {
     game.catalog()->setLanguage(translator.language());
     QObject::connect(&translator, &Translator::changed, game.catalog(),
                      [&] { game.catalog()->setLanguage(translator.language()); });
+    // Reminders handed to Android carry their texts: plan them again in the
+    // new language.
+    QObject::connect(&translator, &Translator::changed, game.reminders(), &Reminders::replan);
     game.load();
     Updater updater;
 

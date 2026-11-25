@@ -40,7 +40,19 @@ Rectangle {
         window.toast(qsTr("%1 bought. Place it in build mode.").arg(name))
     }
 
-    Keys.onEscapePressed: itemId !== "" ? itemId = "" : close()
+    // Esc and Android's back (see Main.qml): close the filter sheet or the
+    // sort menu, else leave a variant page. False when nothing was open.
+    function back() {
+        if (filters.visible || sortMenu.visible) {
+            filters.close()
+            sortMenu.close()
+        } else if (itemId !== "") {
+            itemId = ""
+        } else {
+            return false
+        }
+        return true
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -56,7 +68,7 @@ Rectangle {
             Layout.rightMargin: 18
             Text {
                 Layout.fillWidth: true
-                text: shop.itemId === "" ? qsTr("Shop") : catalog.itemInfo(shop.itemId).name
+                text: { catalog.language; return shop.itemId === "" ? qsTr("Shop") : catalog.itemInfo(shop.itemId).name }
                 color: Ui.text
                 font.pixelSize: 30
                 font.bold: true
@@ -168,7 +180,9 @@ Rectangle {
                 readonly property var modelData: grid.entries[index] || ({})
                 readonly property bool isVariantPage: shop.itemId !== ""
                 readonly property bool hasVariants: !isVariantPage && modelData.variantCount > 1
-                readonly property string variantId: isVariantPage ? modelData.id : modelData.variant
+                // Empty for the moment the entries switch between the
+                // overview and a variant page.
+                readonly property string variantId: (isVariantPage ? modelData.id : modelData.variant) || ""
                 readonly property int owned: island.owned(variantId, island.revision)
                 readonly property bool affordable: profile.fish >= modelData.price
                 width: grid.cellWidth
@@ -249,8 +263,10 @@ Rectangle {
                                     font.bold: true
                                 }
                             }
+                            // Only on single items: an overview card stands for
+                            // every variant, and the row has no room for it.
                             Text {
-                                visible: !!shop.justBought[cardBox.variantId]
+                                visible: !cardBox.hasVariants && !!shop.justBought[cardBox.variantId]
                                 text: qsTr("Added")
                                 color: Ui.green
                                 font.pixelSize: 11
@@ -276,7 +292,10 @@ Rectangle {
                 }
             }
 
+            // On the grid itself: the content item is 0 px high when empty,
+            // which would cut the text in half at the top edge.
             Text {
+                parent: grid
                 anchors.centerIn: parent
                 visible: grid.count === 0
                 text: qsTr("Nothing matches. Try other filters.")
@@ -294,6 +313,8 @@ Rectangle {
         x: (shop.width - width) / 2
         y: shop.height - height
         modal: true
+        // Takes the keys, so Esc and back close the sheet, not the shop.
+        focus: true
         padding: 20
         Material.roundedScale: theme.radius
         background: Rectangle { color: Ui.panel; radius: Math.min(16, 8 + theme.radius) }
@@ -315,7 +336,7 @@ Rectangle {
                 onClicked: filters.draft = []
             }
             Repeater {
-                model: catalog.categories()
+                model: { catalog.language; return catalog.categories() }
                 CheckDelegate {
                     required property var modelData
                     Layout.fillWidth: true

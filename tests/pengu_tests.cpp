@@ -19,6 +19,7 @@
 #include "reminders.h"
 #include "theme.h"
 #include "translator.h"
+#include "updater.h"
 
 class PenguTests : public QObject {
     Q_OBJECT
@@ -183,6 +184,23 @@ private slots:
         Q_UNUSED(grouped);
     }
 
+    void groupsSortIgnoringCaseAndAccents() {
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today);
+        QVERIFY(book.sections("todo").isEmpty()); // The page shows its "no habits" hint.
+        QCOMPARE(book.sections("done").size(), 1);
+        for (const char *group : {"Übungen", "Zähne", "Morgens", "abends"})
+            book.add({{"name", "x"}, {"group", QString::fromUtf8(group)}});
+        // Sections and the Group picker agree, A–Z on every platform.
+        const QStringList order{"abends", "Morgens", "Übungen", "Zähne"};
+        QCOMPARE(book.groups(), order);
+        QStringList titles;
+        for (const auto &section : book.sections("todo"))
+            titles << section.toMap().value("title").toString();
+        QCOMPARE(titles, QStringList() << QString() << order << QString()); // Ungrouped, …, unscheduled.
+    }
+
     void perfectDays() {
         Profile p;
         HabitBook book(&p);
@@ -281,6 +299,41 @@ private slots:
         book.shiftDay(-3);
         book.setToday(today.addDays(2));
         QCOMPARE(book.viewDate(), iso(today.addDays(-2)));
+    }
+
+    void browsingDaysSavesNothing() {
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today);
+        const QString id = book.add({{"name", "Walk"}});
+        QSignalSpy changed(&book, &HabitBook::changed);
+        QSignalSpy edited(&book, &HabitBook::edited);
+        book.shiftDay(-1);
+        book.goToday();
+        book.goToday(); // Already there: not even a refresh.
+        QCOMPARE(changed.size(), 2);
+        QCOMPARE(edited.size(), 0);
+        book.setStatus(id, iso(today), "done");
+        QCOMPARE(edited.size(), 1);
+    }
+
+    void ticksDatedAheadSurviveFlyingWest() {
+        // Ticked in Tokyo, reopened in Los Angeles where it is still the day before.
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today.addDays(-1));
+        const QString id = book.add({{"name", "Run"}, {"difficulty", 3}});
+        book.setToday(today);
+        QVERIFY(book.setStatus(id, iso(today), "done"));
+
+        Profile p2;
+        HabitBook west(&p2);
+        west.setToday(today.addDays(-1));
+        west.fromJson(book.toJson());
+        west.setToday(today);
+        QCOMPARE(west.status(id, today), QString("done"));
+        QVERIFY(west.setStatus(id, iso(today), "done"));
+        QCOMPARE(p2.fish(), 0); // Not paid a second time.
     }
 
     void habitsRoundTripAndSanitize() {
@@ -710,6 +763,53 @@ private slots:
         // The next evening it is open again (nothing ticked for the 19th).
         reminders.check(QDateTime(today.addDays(1), QTime(20, 5)));
         QCOMPARE(sent.size(), 2);
+    }
+
+    void firedRemindersSurviveARestart() {
+        Profile p;
+        HabitBook book(&p);
+        book.setToday(today);
+        p.setNotifications(true);
+        p.setEveningReminder(true);
+        book.add({{"name", "Floss"}});
+        QStringList sent;
+        auto sender = [&](const QString &title, const QString &) { sent << title; };
+        Reminders first(&book, &p);
+        first.setSender(sender);
+        first.check(QDateTime(today, QTime(20, 5)));
+        QCOMPARE(sent.size(), 1);
+        // A new process inside the same window remembers it from the save...
+        Reminders again(&book, &p);
+        again.setSender(sender);
+        again.fromJson(first.toJson());
+        again.check(QDateTime(today, QTime(20, 10)));
+        QCOMPARE(sent.size(), 1);
+        // ...which is what keeps it from sending it twice.
+        Reminders forgetful(&book, &p);
+        forgetful.setSender(sender);
+        forgetful.check(QDateTime(today, QTime(20, 10)));
+        QCOMPARE(sent.size(), 2);
+    }
+
+    // ----------------------------------------------------------------- updater
+
+    void updaterReadsReleaseInfo() {
+        // version.json: a release built for a newer Qt than this system's is
+        // left out (an older known one stays offered); unsafe file names are refused.
+        Updater updater(nullptr, QString(), 5);
+        const auto release = [](int build, const QByteArray &qt) {
+            return "{\"build\":" + QByteArray::number(build) + ",\"version\":\"0.2." + QByteArray::number(build)
+                   + "\",\"assets\":{\"" + Updater::platformKey().toUtf8() + "\":{\"file\":\"pengu.pkg\",\"qt\":\"" + qt + "\"}}}";
+        };
+        QVERIFY(updater.parseRelease(release(7, "99.0")));
+        QCOMPARE(updater.latestVersion(), QString());
+        QVERIFY(updater.parseRelease(release(7, "6.0")));
+        QCOMPARE(updater.latestVersion(), QString("0.2.7"));
+        QVERIFY(updater.parseRelease(release(8, "")));
+        QCOMPARE(updater.latestVersion(), QString("0.2.8"));
+        QVERIFY(updater.parseRelease(release(9, "99.0")));
+        QCOMPARE(updater.latestVersion(), QString("0.2.8"));
+        QVERIFY(!updater.parseRelease("{\"build\":10,\"assets\":{\"linux\":{\"file\":\"../x\"},\"android\":{\"file\":\"../x\"}}}"));
     }
 
     // ------------------------------------------------- theme and translations

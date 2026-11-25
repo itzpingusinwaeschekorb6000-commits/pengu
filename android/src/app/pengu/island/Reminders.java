@@ -11,6 +11,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.provider.Settings;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -65,12 +66,18 @@ public final class Reminders {
                 Intent intent = new Intent(context, ReminderReceiver.class)
                         .putExtra("title", item.optString("title"))
                         .putExtra("body", item.optString("body"))
-                        .putExtra("id", (int) (at / 60000));
+                        // Distinct per reminder, so two due the same minute
+                        // (a habit and the morning nudge) both show.
+                        .putExtra("id", (item.optString("title") + at).hashCode());
                 PendingIntent pending = PendingIntent.getBroadcast(context, count, intent,
                         PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-                // Inexact but allowed while the phone dozes; needs no special
-                // permission, and a few minutes late is fine for a reminder.
-                alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending);
+                // On the minute, also while the phone dozes. An inexact alarm
+                // may come an hour late (Android 12+) or hours late (older);
+                // it is only the fallback if exact alarms were taken away.
+                if (Build.VERSION.SDK_INT < 31 || alarms.canScheduleExactAlarms())
+                    alarms.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending);
+                else
+                    alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending);
                 count++;
             }
         } catch (Exception e) {
@@ -79,18 +86,34 @@ public final class Reminders {
         prefs.edit().putInt(KEY_COUNT, count).apply();
     }
 
+    // Creating it again only updates its name, in the phone's language.
     static void ensureChannel(Context context) {
-        if (Build.VERSION.SDK_INT < 26)
-            return;
-        NotificationManager manager = context.getSystemService(NotificationManager.class);
-        if (manager.getNotificationChannel(CHANNEL) == null)
-            manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Erinnerungen",
-                    NotificationManager.IMPORTANCE_DEFAULT));
+        context.getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(
+                CHANNEL, context.getString(R.string.reminders_channel), NotificationManager.IMPORTANCE_DEFAULT));
     }
 
     // Shows a notification right away (the "notifications are on" test).
     public static void show(Context context, String title, String body) {
         ReminderReceiver.notify(context, title, body, (int) (System.currentTimeMillis() / 1000));
+    }
+
+    // Whether the phone lets Pengu's reminders through: the permission
+    // (Android 13+), the app's switch and the reminders channel.
+    public static boolean allowed(Context context) {
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        NotificationChannel channel = manager.getNotificationChannel(CHANNEL);
+        return manager.areNotificationsEnabled()
+                && (channel == null || channel.getImportance() != NotificationManager.IMPORTANCE_NONE);
+    }
+
+    // Pengu's page in the phone's notification settings, where blocked
+    // reminders are allowed again.
+    public static void openSettings(Context context) {
+        Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+        if (!(context instanceof Activity))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        context.startActivity(intent);
     }
 
     // Android 13+ asks the user once before an app may post notifications.

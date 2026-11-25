@@ -40,7 +40,7 @@ Rectangle {
         reminderTime.text = "09:00"
         helpDescription = helpTwoMinute = false
         flick.contentY = 0
-        name.forceActiveFocus()
+        focusName()
     }
 
     function openEdit(id) {
@@ -58,7 +58,35 @@ Rectangle {
         reminderTime.text = h.reminderTime
         helpDescription = helpTwoMinute = false
         flick.contentY = 0
-        name.forceActiveFocus()
+        focusName()
+    }
+
+    // Ready to type on the desktop. A phone would pop up its keyboard over
+    // the form before anything is tapped, so there the field waits for a tap.
+    function focusName() {
+        if (!window.mobile)
+            name.forceActiveFocus()
+    }
+
+    // Scrolls the focused field into view. Qt Quick does not do that for a
+    // Flickable, and on phones the keyboard shrinks the window, which can
+    // leave the field just tapped (Group, reminder time) below the edge.
+    function reveal() {
+        const item = window.activeFocusItem
+        let p = item
+        while (p && p !== flick.contentItem)
+            p = p.parent
+        if (!p || !form.visible)
+            return
+        const top = item.mapToItem(flick.contentItem, 0, 0).y
+        if (top + item.height > flick.contentY + flick.height)
+            flick.contentY = Math.max(0, Math.min(top + item.height + 12 - flick.height, flick.contentHeight - flick.height))
+        else if (top < flick.contentY)
+            flick.contentY = Math.max(0, top - 12)
+    }
+    Connections {
+        target: window
+        function onActiveFocusItemChanged() { Qt.callLater(form.reveal) }
     }
 
     readonly property bool timeValid: /^([01]\d|2[0-3]):[0-5]\d$/.test(reminderTime.text)
@@ -84,6 +112,10 @@ Rectangle {
 
     Keys.onEscapePressed: finished()
 
+    // Takes presses on the margin around the form, so they do not reach the
+    // dimmed backdrop below, which closes the form and loses what was typed.
+    MouseArea { anchors.fill: parent }
+
     Flickable {
         id: flick
         anchors.fill: parent
@@ -92,6 +124,7 @@ Rectangle {
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar {}
+        onHeightChanged: Qt.callLater(form.reveal) // The keyboard opened or closed.
 
         ColumnLayout {
             id: column
@@ -256,6 +289,8 @@ Rectangle {
                             width: 76
                             horizontalAlignment: TextInput.AlignHCenter
                             inputMask: "99:99"
+                            // A number pad on phones; the mask adds the colon.
+                            inputMethodHints: Qt.ImhDigitsOnly | Qt.ImhNoPredictiveText
                             text: "09:00"
                             color: form.timeValid ? Ui.text : Ui.red
                             Material.roundedScale: theme.radius

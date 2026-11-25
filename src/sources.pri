@@ -41,6 +41,10 @@ PENGU_VERSION = $$cat($$PWD/../VERSION).$$PENGU_BUILD
 # The GitHub repository releases are published to (owner/name).
 PENGU_REPO = $$cat($$PWD/../REPO)
 
-DEFINES += PENGU_BUILD=$$PENGU_BUILD \
-           PENGU_VERSION=\\\"$$PENGU_VERSION\\\" \
-           PENGU_REPO=\\\"$$PENGU_REPO\\\"
+# A generated header rather than -D flags: make does not rebuild objects for
+# changed flags, so they kept old version numbers. qmake rewrites the header
+# only when a value changed, and make then rebuilds what includes it.
+version_h.input = $$PWD/pengu_version.h.in
+version_h.output = $$OUT_PWD/pengu_version.h
+QMAKE_SUBSTITUTES += version_h
+INCLUDEPATH += $$OUT_PWD

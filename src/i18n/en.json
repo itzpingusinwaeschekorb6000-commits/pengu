@@ -10,5 +10,13 @@
  "%n days": {
   "one": "%n day",
   "other": "%n days"
+ },
+ "%1 reminds you: %n habits left for today.": {
+  "one": "%1 reminds you: %n habit left for today.",
+  "other": "%1 reminds you: %n habits left for today."
+ },
+ "Level %1 • %2 XP • %3 sardines": {
+  "one": "Level %1 • %2 XP • %3 sardine",
+  "other": "Level %1 • %2 XP • %3 sardines"
  }
 }

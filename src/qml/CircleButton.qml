@@ -45,6 +45,8 @@ Rectangle {
     MouseArea {
         id: area
         anchors.fill: parent
+        // At least 44 px to tap, however small the circle.
+        anchors.margins: Math.min(0, (root.width - 44) / 2)
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: root.clicked()

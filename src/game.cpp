@@ -22,13 +22,25 @@ Game::Game(const QString &savePath, QObject *parent)
     connect(&m_saveTimer, &QTimer::timeout, this, &Game::save);
     for (auto signal : {&Profile::progressChanged, &Profile::settingsChanged})
         connect(&m_profile, signal, this, &Game::scheduleSave);
-    connect(&m_habits, &HabitBook::changed, this, &Game::scheduleSave);
+    connect(&m_habits, &HabitBook::edited, this, &Game::scheduleSave);
     connect(&m_island, &Island::changed, this, &Game::scheduleSave);
+    connect(&m_reminders, &Reminders::firedChanged, this, &Game::scheduleSave);
 
     // Moves "today" forward at midnight while the app stays open.
     m_clock.setInterval(30 * 1000);
     connect(&m_clock, &QTimer::timeout, &m_habits, &HabitBook::checkDayChange);
     m_clock.start();
+
+    // Android stops timers once Pengu leaves the screen and may end it there
+    // without exec() returning: write a pending change right away. Back in
+    // front (maybe after a night asleep), catch up with the date first, so a
+    // tick before the next clock check does not land on yesterday.
+    connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state == Qt::ApplicationActive)
+            m_habits.checkDayChange();
+        else if (m_saveTimer.isActive())
+            save();
+    });
 }
 
 Game::~Game() {
@@ -78,6 +90,7 @@ void Game::load() {
             m_profile.fromJson(root.value("profile").toObject());
             m_habits.fromJson(root.value("habits").toObject());
             m_island.fromJson(root.value("island").toObject());
+            m_reminders.fromJson(root.value("reminders").toObject());
         } else if (root.isEmpty() || !migrate(root)) {
             // Keep the broken file next to the new one instead of losing it.
             const QString backup = m_path + ".broken-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss");
@@ -89,6 +102,7 @@ void Game::load() {
             m_profile.fromJson(root.value("profile").toObject());
             m_habits.fromJson(root.value("habits").toObject());
             m_island.fromJson(root.value("island").toObject());
+            m_reminders.fromJson(root.value("reminders").toObject());
         }
     }
     if (fresh) {
@@ -110,7 +124,8 @@ bool Game::save() {
                            {"app", "pengu"},
                            {"profile", m_profile.toJson()},
                            {"habits", m_habits.toJson()},
-                           {"island", m_island.toJson()}};
+                           {"island", m_island.toJson()},
+                           {"reminders", m_reminders.toJson()}};
     // Written beside the target and renamed over it, so a crash mid-write
     // never leaves a half-written save behind.
     QSaveFile file(m_path);

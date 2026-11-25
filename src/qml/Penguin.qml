@@ -26,6 +26,9 @@ Item {
 
     function goTo(x, y, sitAfter) {
         route = island.path(tileX(), tileY(), x, y)
+        // No way there (walled in or cut off): do not sit down out here.
+        if (route.length === 0 && (x !== tileX() || y !== tileY()))
+            sitAfter = false
         sitWhenThere = sitAfter
         sitting = false
         step()
@@ -34,6 +37,8 @@ Item {
     function step() {
         if (route.length === 0) {
             walking = false
+            // The last tile may have been built on or removed on the way.
+            rescue()
             if (sitWhenThere) {
                 const spot = island.restSpot()
                 if (spot.faceX !== undefined)
@@ -116,6 +121,15 @@ Item {
         function onChanged() { Qt.callLater(penguin.rescue) }
     }
 
+    // Nothing runs while the island is hidden behind a page; the penguin
+    // carries on from where it was when the island is shown again.
+    onVisibleChanged: {
+        if (!visible)
+            brain.stop()
+        else if (!walking)
+            brain.restart()
+    }
+
     Timer {
         id: brain
         interval: 3000
@@ -124,6 +138,7 @@ Item {
 
     ParallelAnimation {
         id: move
+        paused: running && !penguin.visible
         NumberAnimation { id: moveX; target: penguin; property: "tx"; duration: 560 }
         NumberAnimation { id: moveY; target: penguin; property: "ty"; duration: 560 }
         onFinished: penguin.step()
@@ -131,7 +146,7 @@ Item {
 
     // Waddle: rock side to side and bob while walking.
     SequentialAnimation {
-        running: penguin.walking
+        running: penguin.walking && penguin.visible
         loops: Animation.Infinite
         onStopped: { body.rotation = 0; penguin.hop = 0 }
         ParallelAnimation {
@@ -164,7 +179,7 @@ Item {
 
         // Breathing while resting.
         SequentialAnimation on scale {
-            running: !penguin.walking
+            running: !penguin.walking && penguin.visible
             loops: Animation.Infinite
             NumberAnimation { to: 1.03; duration: 1400; easing.type: Easing.InOutSine }
             NumberAnimation { to: 1.0; duration: 1400; easing.type: Easing.InOutSine }

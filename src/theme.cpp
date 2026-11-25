@@ -23,9 +23,9 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
     // Corners follow Hyprland's effective rounding, which themes and personal
     // overrides can both set, so ask hyprctl rather than reading its config.
     // Without Hyprland the corners stay sharp, like Omarchy's default.
+    const QString hyprland = qEnvironmentVariable("HYPRLAND_INSTANCE_SIGNATURE");
     m_hyprctl = !hyprctl.isEmpty() ? hyprctl
-              : directory.isEmpty() && !qEnvironmentVariableIsEmpty("HYPRLAND_INSTANCE_SIGNATURE")
-                  ? QStandardPaths::findExecutable("hyprctl") : QString();
+              : directory.isEmpty() && !hyprland.isEmpty() ? QStandardPaths::findExecutable("hyprctl") : QString();
     m_roundingTimeout.setSingleShot(true);
     m_roundingTimeout.setInterval(500);
     connect(&m_roundingTimeout, &QTimer::timeout, &m_roundingProcess, &QProcess::kill);
@@ -40,10 +40,17 @@ Theme::Theme(const QString &directory, QObject *parent, const QString &hyprctl)
             emit changed();
         }
     });
-    m_roundingPoll.setInterval(1000);
-    connect(&m_roundingPoll, &QTimer::timeout, this, &Theme::refreshRounding);
-    if (!m_hyprctl.isEmpty())
-        m_roundingPoll.start();
+    // Hyprland announces every config reload on its event socket (a theme
+    // switch reloads it only after the files changed); ask hyprctl again
+    // then, rather than polling it every second.
+    connect(&m_hyprlandEvents, &QLocalSocket::readyRead, this, [this] {
+        while (m_hyprlandEvents.canReadLine())
+            if (m_hyprlandEvents.readLine().startsWith("configreloaded>>"))
+                m_debounce.start();
+    });
+    if (!m_hyprctl.isEmpty() && !hyprland.isEmpty())
+        m_hyprlandEvents.connectToServer(qEnvironmentVariable("XDG_RUNTIME_DIR") + "/hypr/" + hyprland
+                                         + "/.socket2.sock");
 #ifdef Q_OS_ANDROID
     // Phones have no Omarchy theme; rounded corners suit touch screens.
     m_radius = 12;

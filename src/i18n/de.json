@@ -5,7 +5,6 @@
  "Move what stands on this tile first.": "Verschiebe zuerst, was auf diesem Feld steht.",
  "Done": "Erledigt",
  "Click tiles to place it. Right-click to stop.": "Klicke auf Felder zum Platzieren. Rechtsklick beendet.",
- "Tap a tile to place something. Drag to move it.": "Tippe auf ein Feld, um etwas zu platzieren. Ziehen zum Verschieben.",
  "Back": "Zurück",
  "None owned yet.": "Noch nichts im Besitz.",
  "Buy some in the Shop.": "Kauf etwas im Shop.",
@@ -117,7 +116,6 @@
  "Copy": "Kopieren",
  "User ID copied.": "Nutzer-ID kopiert.",
  "Reset XP & Sardines": "XP & Sardinen zurücksetzen",
- "Level %1 • %2 XP • %3 sardines": "Level %1 • %2 XP • %3 Sardinen",
  "Reset": "Zurücksetzen",
  "DATA": "DATEN",
  "Saved locally": "Lokal gespeichert",
@@ -135,7 +133,7 @@
  "Sort: %1": "Sortierung: %1",
  "Filters (%1)": "Filter (%1)",
  "Filters": "Filter",
- "Owned %1": "Besitzt %1",
+ "Owned %1": "Im Besitz: %1",
  "%1 variants": "%1 Varianten",
  "Added": "Hinzugefügt",
  "Click to buy one": "Klicken, um eins zu kaufen",
@@ -172,7 +170,6 @@
  "Time for this habit.": "Zeit für diese Gewohnheit.",
  "Even the 2-minute version counts: %1": "Auch die 2-Minuten-Version zählt: %1",
  "Habits still open": "Noch offene Gewohnheiten",
- "%1 reminds you: %2 habits left for today.": "%1 erinnert dich: heute sind noch %2 offen.",
  "Notifications are on": "Benachrichtigungen sind an",
  "%1 will remind you here.": "%1 erinnert dich ab jetzt hier.",
  "APP": "APP",
@@ -201,5 +198,22 @@
  "Could not save the update: %1": "Das Update konnte nicht gespeichert werden: %1",
  "Android did not open the installer.": "Android hat den Installer nicht geöffnet.",
  "Enabled. Pengu reminds you even when the app is closed.": "Aktiviert. Pengu erinnert dich auch, wenn die App geschlossen ist.",
- "Tap tiles to place it. Tap it in the tray again to stop.": "Tippe auf Felder zum Platzieren. Nochmal in der Leiste antippen beendet."
+ "Tap tiles to place it. Tap it in the tray again to stop.": "Tippe auf Felder zum Platzieren. Nochmal in der Leiste antippen beendet.",
+ "Finish": "Fertig",
+ "Pick something below, then tap a tile. Drag things to move them.": "Wähle unten etwas aus, dann tippe auf ein Feld. Ziehen zum Verschieben.",
+ "Pick something below, then click a tile. Drag things to move them.": "Wähle unten etwas aus, dann klicke auf ein Feld. Ziehen zum Verschieben.",
+ "dddd, MMMM d": "dddd, d. MMMM",
+ "Not scheduled on this day": "An diesem Tag nicht geplant",
+ "Pengu was not allowed to install the update.": "Pengu durfte das Update nicht installieren.",
+ "%1 reminds you: %n habits left for today.": {
+  "one": "%1 erinnert dich: heute ist noch %n Gewohnheit offen.",
+  "other": "%1 erinnert dich: heute sind noch %n Gewohnheiten offen."
+ },
+ "Blocked by Android": "Von Android blockiert",
+ "Reminders cannot arrive until you allow Pengu's notifications in Android's settings.": "Erinnerungen kommen erst an, wenn du die Benachrichtigungen von Pengu in den Android-Einstellungen erlaubst.",
+ "Allow": "Erlauben",
+ "Level %1 • %2 XP • %3 sardines": {
+  "one": "Level %1 • %2 XP • %3 Sardine",
+  "other": "Level %1 • %2 XP • %3 Sardinen"
+ }
 }

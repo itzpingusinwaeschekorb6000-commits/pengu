@@ -2,7 +2,10 @@
 # Regenerates src/resources.qrc from the files in src/, so a new sprite, QML
 # file or translation is picked up without editing XML by hand.
 set -eu
+# The same file order on every machine.
+export LC_ALL=C
 cd "$(dirname -- "$0")/../src"
+tmp="resources.qrc.$$"
 {
   echo '<RCC>'
   echo '    <qresource prefix="/">'
@@ -11,4 +14,7 @@ cd "$(dirname -- "$0")/../src"
   done
   echo '    </qresource>'
   echo '</RCC>'
-} > resources.qrc
+} > "$tmp"
+# Replaced only when the list changed, and in one step: rcc reruns only when
+# needed, and a build running in parallel never reads half a file.
+if cmp -s "$tmp" resources.qrc; then rm -f "$tmp"; else mv -f "$tmp" resources.qrc; fi

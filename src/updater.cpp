@@ -5,13 +5,19 @@
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLibraryInfo>
 #include <QNetworkReply>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QSysInfo>
 #include <QUrl>
+#include <QVersionNumber>
+
+#include <memory>
 
 namespace {
 constexpr int CheckEveryMinutes = 6 * 60;
@@ -27,24 +33,36 @@ Updater::Updater(QObject *parent, const QString &repo, int build)
 #elif defined(Q_OS_LINUX)
     // Only the installed package updates itself; a build from the source tree
     // is updated with git, and pacman must be there to install the package.
+    // Releases carry an x86_64 package only.
     m_supported = configured && QCoreApplication::applicationFilePath().startsWith("/usr/")
+                  && QSysInfo::buildCpuArchitecture() == QLatin1String("x86_64")
                   && !QStandardPaths::findExecutable("pacman").isEmpty()
                   && !QStandardPaths::findExecutable("pkexec").isEmpty();
 #endif
     if (!m_supported)
         return;
+    // Left over from the last run: installed by now, or given up. A 33 MB APK
+    // would also push the app data over Android's backup limit.
+    QDir(downloadDirectory()).removeRecursively();
 
     m_timer.setInterval(CheckEveryMinutes * 60 * 1000);
     connect(&m_timer, &QTimer::timeout, this, &Updater::check);
     m_timer.start();
-    QTimer::singleShot(3000, this, &Updater::check);
+    // Usually the first activation below has checked already.
+    QTimer::singleShot(3000, this, [this] {
+        if (!m_lastCheck.isValid())
+            check();
+    });
     // Phones keep apps alive in the background for days; check on return.
     connect(qGuiApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState s) {
         if (s != Qt::ApplicationActive)
             return;
+#if defined(Q_OS_ANDROID)
         // Back from the system installer without updating: offer it again.
+        // (On Linux pacman is still running when the password prompt closes.)
         if (m_state == "installing")
             setState("available");
+#endif
         if (!m_lastCheck.isValid() || m_lastCheck.secsTo(QDateTime::currentDateTime()) > RecheckOnResumeMinutes * 60)
             check();
     });
@@ -52,14 +70,17 @@ Updater::Updater(QObject *parent, const QString &repo, int build)
     connect(&m_installer, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
         if (status == QProcess::NormalExit && code == 0)
             setState("restart");
+        // pkexec: 126 means the password prompt was cancelled, 127 that it
+        // was refused or no polkit agent could ask.
+        else if (status == QProcess::NormalExit && code == 126)
+            setState("available");
         else
-            // 126/127: the password prompt was cancelled.
-            setState("available", code == 126 || code == 127 ? QString()
-                                                             : tr("Installing failed (pacman exit code %1).").arg(code));
+            setState("error", code == 127 ? tr("Pengu was not allowed to install the update.")
+                                          : tr("Installing failed (pacman exit code %1).").arg(code));
     });
     connect(&m_installer, &QProcess::errorOccurred, this, [this](QProcess::ProcessError e) {
         if (e == QProcess::FailedToStart)
-            setState("available", tr("Could not start the installer."));
+            setState("error", tr("Could not start the installer."));
     });
 }
 
@@ -92,6 +113,12 @@ bool Updater::parseRelease(const QByteArray &json) {
     // A plain file name only: it is appended to the release's download URL.
     if (build <= 0 || file.isEmpty() || file.contains('/') || file.startsWith('.'))
         return false;
+    // Built against a newer Qt than this system has (Linux): it would not
+    // start, so wait for the system upgrade.
+    if (QVersionNumber::fromString(asset.value("qt").toString()) > QLibraryInfo::version())
+        return true;
+    if (build != m_latestBuild)
+        m_readyFile.clear();
     m_latestBuild = build;
     m_latestVersion = root.value("version").toString(QString::number(build));
     m_notes = root.value("notes").toString();
@@ -104,7 +131,9 @@ void Updater::check() {
     if (!m_supported || m_reply || m_state == "downloading" || m_state == "installing" || m_state == "restart")
         return;
     m_lastCheck = QDateTime::currentDateTime();
-    setState("checking");
+    // Re-checks while an update is offered run quietly.
+    if (m_state != "available")
+        setState("checking");
 
     QNetworkRequest request(QUrl("https://github.com/" + m_repo + "/releases/latest/download/version.json"));
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
@@ -112,16 +141,22 @@ void Updater::check() {
     m_reply = m_network.get(request);
     connect(m_reply, &QNetworkReply::finished, this, [this, reply = m_reply] {
         reply->deleteLater();
+        QString error;
         if (reply->error() != QNetworkReply::NoError) {
-            // No release yet, or offline: nothing to offer, try again later.
-            setState("idle", reply->error() == QNetworkReply::ContentNotFoundError ? QString() : reply->errorString());
+            // No release yet, or offline: try again later.
+            if (reply->error() != QNetworkReply::ContentNotFoundError)
+                error = reply->errorString();
+        } else if (!parseRelease(reply->readAll())) {
+            error = tr("The release information could not be read.");
+        } else {
+            setState(m_latestBuild > m_build ? "available" : "current");
             return;
         }
-        if (!parseRelease(reply->readAll())) {
-            setState("idle", tr("The release information could not be read."));
-            return;
-        }
-        setState(m_latestBuild > m_build ? "available" : "current");
+        // A failed re-check keeps offering the update found before.
+        if (m_latestBuild > m_build)
+            setState("available");
+        else
+            setState("idle", error);
     });
 }
 
@@ -132,14 +167,32 @@ QString Updater::downloadDirectory() const {
 }
 
 void Updater::install() {
-    if (m_state == "available" || (m_state == "error" && m_latestBuild > m_build))
+    if (m_state != "available" && !(m_state == "error" && m_latestBuild > m_build))
+        return;
+    // "Update now" during a quiet re-check: drop the check.
+    if (m_reply) {
+        m_reply->disconnect(this);
+        m_reply->abort();
+        m_reply->deleteLater();
+    }
+    // Back from the installer without updating: the file is still there.
+    if (!m_readyFile.isEmpty() && QFileInfo::exists(m_readyFile))
+        installFile(m_readyFile);
+    else
         download();
 }
 
 void Updater::download() {
-    if (m_reply)
-        return;
     m_progress = 0;
+    QDir().mkpath(downloadDirectory());
+    const QString path = downloadDirectory() + "/" + m_file;
+    // Saved and hashed as it arrives, so the APK is never held in memory.
+    auto file = std::make_shared<QSaveFile>(path);
+    auto hash = std::make_shared<QCryptographicHash>(QCryptographicHash::Sha256);
+    if (!file->open(QIODevice::WriteOnly)) {
+        setState("error", tr("Could not save the update: %1").arg(file->errorString()));
+        return;
+    }
     setState("downloading");
 
     const QUrl url("https://github.com/" + m_repo + "/releases/download/v" + m_latestVersion + "/" + m_file);
@@ -147,31 +200,35 @@ void Updater::download() {
     request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
     request.setTransferTimeout(60000);
     m_reply = m_network.get(request);
+    const auto take = [reply = m_reply, file, hash] {
+        const QByteArray chunk = reply->readAll();
+        hash->addData(chunk);
+        file->write(chunk);
+    };
+    connect(m_reply, &QNetworkReply::readyRead, this, take);
     connect(m_reply, &QNetworkReply::downloadProgress, this, [this](qint64 received, qint64 total) {
         if (total > 0) {
             m_progress = double(received) / double(total);
             emit changed();
         }
     });
-    connect(m_reply, &QNetworkReply::finished, this, [this, reply = m_reply] {
+    connect(m_reply, &QNetworkReply::finished, this, [this, reply = m_reply, file, hash, take, path] {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             setState("error", tr("Download failed: %1").arg(reply->errorString()));
             return;
         }
-        const QByteArray data = reply->readAll();
-        if (!m_sha256.isEmpty()
-            && QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex() != m_sha256.toLatin1()) {
+        take();
+        // An unfinished QSaveFile is thrown away, never left half written.
+        if (!m_sha256.isEmpty() && hash->result().toHex() != m_sha256.toLatin1()) {
             setState("error", tr("The download was damaged. Please try again."));
             return;
         }
-        QDir().mkpath(downloadDirectory());
-        const QString path = downloadDirectory() + "/" + m_file;
-        QSaveFile file(path);
-        if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
-            setState("error", tr("Could not save the update: %1").arg(file.errorString()));
+        if (!file->commit()) {
+            setState("error", tr("Could not save the update: %1").arg(file->errorString()));
             return;
         }
+        m_readyFile = path;
         installFile(path);
     });
 }

@@ -25,7 +25,31 @@ Rectangle {
         page.forceActiveFocus()
     }
 
-    Keys.onEscapePressed: sheet !== "" ? closeSheet() : fabOpen ? fabOpen = false : close()
+    // Esc and Android's back, called by Main: closes what is open on this
+    // page, innermost first. False when nothing was open.
+    function back() {
+        if (cardMenu.visible)
+            cardMenu.close()
+        else if (confirmDelete.visible)
+            confirmDelete.reject()
+        else if (sheet !== "")
+            closeSheet()
+        else if (fabOpen)
+            fabOpen = false
+        else
+            return false
+        return true
+    }
+
+    // The "+N" shows what was really paid: nothing if the tick was refused.
+    // Runs here, not in the card, which the tick rebuilds.
+    function markDone(id) {
+        const before = profile.fish
+        habits.setStatus(id, habits.viewDate, "done")
+        if (profile.fish > before)
+            window.celebrate(profile.fish - before)
+    }
+
     Keys.onLeftPressed: if (section === "habits" && sheet === "") habits.shiftDay(-1)
     Keys.onRightPressed: if (section === "habits" && sheet === "") habits.shiftDay(1)
 
@@ -55,11 +79,16 @@ Rectangle {
                     text: {
                         translator.language
                         const d = new Date(habits.viewDate + "T12:00:00")
-                        return d.toLocaleDateString(Qt.locale(), "dddd, d. MMMM")
+                        // Each language orders day and month its own way.
+                        return d.toLocaleDateString(Qt.locale(), qsTr("dddd, MMMM d"))
                     }
                     color: Ui.text
                     font.pixelSize: 22
                     font.bold: true
+                    // Shrinks rather than cutting the month off on a phone,
+                    // where "Today" and the arrows leave little room.
+                    fontSizeMode: Text.HorizontalFit
+                    minimumPixelSize: 15
                     elide: Text.ElideRight
                 }
                 PillButton {
@@ -114,106 +143,116 @@ Rectangle {
             }
         }
 
-        // Habit list
-        ListView {
+        // Habit list. Every change brings a new sections array; a ListView
+        // would jump back to the top on each tick, a Repeater keeps the
+        // scroll position.
+        Flickable {
             id: list
             visible: page.section === "habits"
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.topMargin: 12
+            contentHeight: sectionColumn.implicitHeight + 90 // Room for the + button.
             clip: true
-            spacing: 10
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
-            model: habits.sections(page.tab, habits.revision)
-            footer: Item { width: 1; height: 90 }
 
-            // ListView pins delegates to x: 0, so each one spans the full width
-            // and centers its column inside.
-            delegate: Item {
-                id: sec
-                required property var modelData
+            Column {
+                id: sectionColumn
                 width: list.width
-                height: secColumn.implicitHeight
-                readonly property bool headed: page.tab === "todo"
-                readonly property bool folded: !!page.collapsed[modelData.key]
-                // "Not scheduled today" starts folded, like in the original.
-                readonly property bool hiddenCards: headed && (folded !== (modelData.key === "unscheduled"))
-
-                ColumnLayout {
-                id: secColumn
-                width: Math.min(list.width - 36, Ui.contentWidth)
-                anchors.horizontalCenter: parent.horizontalCenter
                 spacing: 10
-
-                Rectangle {
-                    visible: sec.headed
-                    Layout.fillWidth: true
-                    implicitHeight: 42
-                    radius: Math.min(10, 6 + theme.radius)
-                    color: Ui.card
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: (sec.modelData.key === "unscheduled" ? qsTr("Not scheduled today")
-                               : sec.modelData.title === "" ? qsTr("Ungrouped") : sec.modelData.title)
-                              + " (" + sec.modelData.habits.length + ")"
-                        color: Ui.dim
-                        font.pixelSize: 13
-                    }
-                    Icon {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 12
-                        height: 12
-                        name: sec.hiddenCards ? "down" : "up"
-                        color: Ui.dim
-                        lineWidth: 2
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            const c = Object.assign({}, page.collapsed)
-                            c[sec.modelData.key] = !sec.folded
-                            page.collapsed = c
-                        }
-                    }
-                }
-
                 Repeater {
-                    model: sec.hiddenCards ? [] : sec.modelData.habits
-                    HabitCard {
+                    model: habits.sections(page.tab, habits.revision)
+
+                    // Each section spans the full width and centers its column inside.
+                    delegate: Item {
+                        id: sec
                         required property var modelData
-                        Layout.fillWidth: true
-                        habit: modelData
-                        mode: page.tab
-                        onMarkDone: {
-                            habits.setStatus(modelData.id, habits.viewDate, "done")
-                            window.celebrate(modelData.reward)
+                        width: list.width
+                        height: secColumn.implicitHeight
+                        readonly property bool headed: page.tab === "todo"
+                        readonly property bool folded: !!page.collapsed[modelData.key]
+                        // "Not scheduled today" starts folded, like in the original.
+                        readonly property bool hiddenCards: headed && (folded !== (modelData.key === "unscheduled"))
+
+                        ColumnLayout {
+                            id: secColumn
+                            width: Math.min(list.width - 36, Ui.contentWidth)
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 10
+
+                            Rectangle {
+                                visible: sec.headed
+                                Layout.fillWidth: true
+                                implicitHeight: 42
+                                radius: Math.min(10, 6 + theme.radius)
+                                color: Ui.card
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: (sec.modelData.key === "unscheduled"
+                                           ? (habits.viewingToday ? qsTr("Not scheduled today") : qsTr("Not scheduled on this day"))
+                                           : sec.modelData.title === "" ? qsTr("Ungrouped") : sec.modelData.title)
+                                          + " (" + sec.modelData.habits.length + ")"
+                                    color: Ui.dim
+                                    font.pixelSize: 13
+                                }
+                                Icon {
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 14
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 12
+                                    height: 12
+                                    name: sec.hiddenCards ? "down" : "up"
+                                    color: Ui.dim
+                                    lineWidth: 2
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const c = Object.assign({}, page.collapsed)
+                                        c[sec.modelData.key] = !sec.folded
+                                        page.collapsed = c
+                                    }
+                                }
+                            }
+
+                            Repeater {
+                                model: sec.hiddenCards ? [] : sec.modelData.habits
+                                HabitCard {
+                                    id: habitCard
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    habit: modelData
+                                    mode: page.tab
+                                    onMarkDone: page.markDone(modelData.id)
+                                    onMarkSkipped: habits.setStatus(modelData.id, habits.viewDate, "skipped")
+                                    onUndo: habits.setStatus(modelData.id, habits.viewDate, "")
+                                    onEdit: { page.sheet = "form"; form.openEdit(modelData.id) }
+                                    onRemove: { confirmDelete.habitId = modelData.id; confirmDelete.habitName = modelData.name; confirmDelete.open() }
+                                    onMenuRequested: cardMenu.openFor(habitCard)
+                                }
+                            }
+
+                            Text {
+                                visible: !sec.headed && sec.modelData.habits.length === 0
+                                Layout.fillWidth: true
+                                Layout.topMargin: 40
+                                horizontalAlignment: Text.AlignHCenter
+                                text: page.tab === "done" ? qsTr("Nothing done yet on this day.") : qsTr("Nothing skipped on this day.")
+                                color: Ui.faint
+                                font.pixelSize: 14
+                            }
                         }
-                        onMarkSkipped: habits.setStatus(modelData.id, habits.viewDate, "skipped")
-                        onUndo: habits.setStatus(modelData.id, habits.viewDate, "")
-                        onEdit: { page.sheet = "form"; form.openEdit(modelData.id) }
-                        onRemove: { confirmDelete.habitId = modelData.id; confirmDelete.habitName = modelData.name; confirmDelete.open() }
                     }
                 }
-
-                Text {
-                    visible: !sec.headed && sec.modelData.habits.length === 0
-                    Layout.fillWidth: true
-                    Layout.topMargin: 40
-                    horizontalAlignment: Text.AlignHCenter
-                    text: page.tab === "done" ? qsTr("Nothing done yet on this day.") : qsTr("Nothing skipped on this day.")
-                    color: Ui.faint
-                    font.pixelSize: 14
-                }
-            }
             }
 
             Column {
+                // On the visible area, not on the content, which is empty here.
+                parent: list
                 visible: habits.count === 0 && page.tab === "todo"
                 anchors.centerIn: parent
                 spacing: 12
@@ -223,10 +262,14 @@ Rectangle {
             }
         }
 
-        StatsView {
-            visible: page.section === "stats"
+        // Built only while shown: its stats and heatmap would otherwise be
+        // recomputed on every tick.
+        Loader {
+            active: page.section === "stats"
+            visible: active
             Layout.fillWidth: true
             Layout.fillHeight: true
+            sourceComponent: StatsView {}
         }
         SettingsView {
             visible: page.section === "settings"
@@ -245,9 +288,11 @@ Rectangle {
                 anchors.leftMargin: 20
                 anchors.rightMargin: 20
                 Repeater {
-                    model: [{ id: "habits", glyph: "✓", name: qsTr("Habits") },
-                            { id: "stats", glyph: "☷", name: qsTr("Stats") },
-                            { id: "settings", glyph: "⚙", name: qsTr("Settings") }]
+                    // Vector icons: Android's fonts lack ✓ and ☷, and draw ⚙
+                    // as a colored emoji.
+                    model: [{ id: "habits", icon: "check", name: qsTr("Habits") },
+                            { id: "stats", icon: "stats", name: qsTr("Stats") },
+                            { id: "settings", icon: "settings", name: qsTr("Settings") }]
                     Item {
                         required property var modelData
                         Layout.fillWidth: true
@@ -256,7 +301,7 @@ Rectangle {
                         Column {
                             anchors.centerIn: parent
                             spacing: 2
-                            Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.glyph; color: parent.parent.active ? Ui.green : Ui.dim; font.pixelSize: 18 }
+                            Icon { anchors.horizontalCenter: parent.horizontalCenter; width: 20; height: 20; name: modelData.icon; color: parent.parent.active ? Ui.green : Ui.dim; lineWidth: 2 }
                             Text { anchors.horizontalCenter: parent.horizontalCenter; text: modelData.name; color: parent.parent.active ? Ui.green : Ui.dim; font.pixelSize: 11; font.bold: true }
                         }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { page.section = modelData.id; page.fabOpen = false } }
@@ -304,7 +349,9 @@ Rectangle {
         anchors.fill: parent
         visible: page.sheet !== ""
         color: Qt.rgba(0, 0, 0, 0.55)
-        MouseArea { anchors.fill: parent; onClicked: page.closeSheet() }
+        // Takes hover and the wheel too, so the list behind neither scrolls
+        // nor shows tooltips.
+        MouseArea { anchors.fill: parent; hoverEnabled: true; onWheel: (wheel) => wheel.accepted = true; onClicked: page.closeSheet() }
     }
     TemplateSheet {
         visible: page.sheet === "templates"
@@ -342,5 +389,24 @@ Rectangle {
         }
         standardButtons: Dialog.Cancel | Dialog.Ok
         onAccepted: habits.remove(habitId)
+    }
+
+    // Right-click on a card: one menu for all cards, built once instead of
+    // with every card on every tick.
+    Menu {
+        id: cardMenu
+        property HabitCard card: null
+        readonly property bool todo: !!card && card.mode === "todo"
+        function openFor(c) {
+            card = c
+            popup()
+        }
+        // A tick rebuilds the cards; a menu for a card that is gone closes.
+        onCardChanged: if (!card) close()
+        MenuItem { visible: cardMenu.todo; height: visible ? implicitHeight : 0; text: qsTr("Done"); onTriggered: cardMenu.card.markDone() }
+        MenuItem { visible: cardMenu.todo; height: visible ? implicitHeight : 0; text: qsTr("Skip"); onTriggered: cardMenu.card.markSkipped() }
+        MenuItem { visible: !cardMenu.todo; height: visible ? implicitHeight : 0; text: qsTr("Undo"); onTriggered: cardMenu.card.undo() }
+        MenuItem { text: qsTr("Edit"); onTriggered: cardMenu.card.edit() }
+        MenuItem { text: qsTr("Delete"); onTriggered: cardMenu.card.remove() }
     }
 }

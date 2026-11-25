@@ -14,81 +14,86 @@ ApplicationWindow {
     title: "Pengu"
     // Behind the phone's status and navigation bars: sea on the island,
     // the page color elsewhere.
-    color: screen === "island" || screen === "edit" ? "#2a4cb8" : Ui.bg
+    color: showsIsland ? "#2a4cb8" : Ui.bg
 
     Material.theme: Material.Dark
     Material.accent: theme.accent
     Material.roundedScale: theme.radius
 
-    // "island", "edit", "shop", "habits"
-    property string screen: "island"
+    // "island", "edit", "shop", "habits" (not "screen": Window has one).
+    property string current: "island"
+    readonly property bool showsIsland: current === "island" || current === "edit"
     property bool helpVisible: false
-    // For the offscreen harness and future automation.
+    // The item each screen focuses; the offscreen harness uses it too.
     readonly property var pages: ({ habits: habitsPage, shop: shopPage, island: islandView })
 
     function toast(text, isError) { toaster.show(text, isError) }
     function celebrate(amount) { reward.show(amount) }
 
-    // Android's back gesture closes the window: step back to the island
-    // first, and only leave the app from there.
-    onClosing: (close) => {
-        if (!mobile)
-            return
-        if (helpVisible) {
+    // Esc and Android's back: close the help or whatever is open on the page
+    // first, then step back to the island. False when already there.
+    function back() {
+        if (helpVisible)
             helpVisible = false
-            close.accepted = false
-        } else if (screen !== "island") {
+        else if (current === "island")
+            return false
+        else if (!(current === "habits" ? habitsPage.back() : current === "shop" && shopPage.back()))
             go("island")
+        return true
+    }
+
+    // Android's back gesture closes the window; only leave the app from the
+    // island.
+    onClosing: (close) => {
+        if (mobile && back())
             close.accepted = false
-        }
     }
 
     function go(next) {
         helpVisible = false
-        screen = next
+        current = next
         if (next === "shop")
             shopPage.reset()
-        if (next === "shop" || next === "habits")
-            (next === "shop" ? shopPage : habitsPage).forceActiveFocus()
-        else
-            islandView.forceActiveFocus()
+        // Build mode has no page of its own; the island takes the keys.
+        const target = pages[next] || islandView
+        target.forceActiveFocus()
     }
 
     // Shortcuts. Text fields take printable keys first, so typing a name
-    // never triggers these.
-    Shortcut { sequence: "?"; context: Qt.ApplicationShortcut; onActivated: window.helpVisible = !window.helpVisible }
-    Shortcut { sequence: "Q"; context: Qt.ApplicationShortcut; onActivated: Qt.quit() }
-    Shortcut { sequence: "Space"; context: Qt.ApplicationShortcut; onActivated: window.go(window.screen === "habits" ? "island" : "habits") }
-    Shortcut { sequence: "H"; context: Qt.ApplicationShortcut; onActivated: window.go("habits") }
-    Shortcut { sequence: "S"; context: Qt.ApplicationShortcut; onActivated: window.go("shop") }
-    Shortcut { sequence: "B"; context: Qt.ApplicationShortcut; onActivated: window.go(window.screen === "edit" ? "island" : "edit") }
-    Shortcut { sequence: "N"; context: Qt.ApplicationShortcut; onActivated: { window.go("habits"); habitsPage.openNewHabit() } }
-    Shortcut { sequence: "Esc"; context: Qt.ApplicationShortcut; enabled: window.screen === "edit" || window.helpVisible
-               onActivated: window.helpVisible ? window.helpVisible = false : window.go("island") }
-    Shortcut { sequences: ["+", "="]; context: Qt.ApplicationShortcut; enabled: window.screen === "island" || window.screen === "edit"
+    // never triggers these. As window shortcuts they are blocked while a
+    // dialog, menu or the filter sheet is open, so they never act behind one.
+    Shortcut { sequence: "?"; onActivated: window.helpVisible = !window.helpVisible }
+    Shortcut { sequence: "Q"; onActivated: Qt.quit() }
+    Shortcut { sequence: "Space"; onActivated: window.go(window.current === "habits" ? "island" : "habits") }
+    Shortcut { sequence: "H"; onActivated: window.go("habits") }
+    Shortcut { sequence: "S"; onActivated: window.go("shop") }
+    Shortcut { sequence: "B"; onActivated: window.go(window.current === "edit" ? "island" : "edit") }
+    Shortcut { sequence: "N"; onActivated: { window.go("habits"); habitsPage.openNewHabit() } }
+    Shortcut { sequence: "Esc"; onActivated: window.back() }
+    Shortcut { sequences: ["+", "="]; enabled: window.showsIsland
                onActivated: islandView.zoomBy(1.2, islandView.width / 2, islandView.height / 2) }
-    Shortcut { sequence: "-"; context: Qt.ApplicationShortcut; enabled: window.screen === "island" || window.screen === "edit"
+    Shortcut { sequence: "-"; enabled: window.showsIsland
                onActivated: islandView.zoomBy(1 / 1.2, islandView.width / 2, islandView.height / 2) }
-    Shortcut { sequence: "0"; context: Qt.ApplicationShortcut; enabled: window.screen === "island" || window.screen === "edit"
+    Shortcut { sequence: "0"; enabled: window.showsIsland
                onActivated: islandView.centerOnIsland() }
 
     // Right-to-left languages mirror the window; the Translator sets the
     // application's layout direction.
     // On phones the window reaches under the status and navigation bars;
-    // SafeArea keeps everything clear of them (zero on the desktop).
+    // ApplicationWindow already pads its content clear of them (Qt 6.9+),
+    // and the window color fills the space behind them.
     Item {
         anchors.fill: parent
-        anchors.topMargin: window.SafeArea.margins.top
-        anchors.bottomMargin: window.SafeArea.margins.bottom
-        anchors.leftMargin: window.SafeArea.margins.left
-        anchors.rightMargin: window.SafeArea.margins.right
         LayoutMirroring.enabled: Qt.application.layoutDirection === Qt.RightToLeft
         LayoutMirroring.childrenInherit: true
 
         IslandView {
             id: islandView
             anchors.fill: parent
-            editing: window.screen === "edit"
+            // Hidden under the opaque pages, so it neither renders nor
+            // takes input there.
+            visible: window.showsIsland
+            editing: window.current === "edit"
             focus: true
             onPlaceFailed: (reason) => {
                 const messages = {
@@ -107,20 +112,20 @@ ApplicationWindow {
             anchors.top: parent.top
             anchors.topMargin: 16
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: window.screen === "island" || window.screen === "edit"
+            visible: window.showsIsland
         }
 
         UpdateBanner {
             anchors.top: hud.bottom
             anchors.topMargin: 10
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: shown && window.screen === "island"
+            visible: shown && window.current === "island"
             z: 50
         }
 
         // Island controls: build mode, HABITS, shop
         Item {
-            visible: window.screen === "island"
+            visible: window.current === "island"
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.bottom: parent.bottom
@@ -169,7 +174,8 @@ ApplicationWindow {
         }
 
         EditTray {
-            visible: window.screen === "edit"
+            id: editTray
+            visible: window.current === "edit"
             view: islandView
             anchors.left: parent.left
             anchors.right: parent.right
@@ -182,14 +188,14 @@ ApplicationWindow {
         ShopPage {
             id: shopPage
             anchors.fill: parent
-            visible: window.screen === "shop"
+            visible: window.current === "shop"
             onClose: window.go("island")
         }
 
         HabitsPage {
             id: habitsPage
             anchors.fill: parent
-            visible: window.screen === "habits"
+            visible: window.current === "habits"
             onClose: window.go("island")
         }
 
@@ -222,7 +228,8 @@ ApplicationWindow {
             id: toaster
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: window.screen === "edit" ? 230 : 100
+            // Clear of the build tray, whose height follows the selection.
+            anchors.bottomMargin: window.current === "edit" ? editTray.height + 30 : 100
             z: 100
         }
 
@@ -231,6 +238,8 @@ ApplicationWindow {
             readonly property string message: game.saveError !== "" ? game.saveError : game.loadError
             visible: message !== "" && !dismissed
             property bool dismissed: false
+            // Dismissing hides only this message; a new problem shows again.
+            onMessageChanged: dismissed = false
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right

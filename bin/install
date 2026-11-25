@@ -2,6 +2,6 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-"$ROOT/bin/build"
+# makepkg runs bin/build itself, after -s has installed missing dependencies.
 cd "$ROOT/pkgbuild"
 exec makepkg -fsi "$@"

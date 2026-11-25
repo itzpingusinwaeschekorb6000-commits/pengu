@@ -8,5 +8,6 @@ Text {
     text: "💡 " + (open ? qsTr("Hide help") : qsTr("Help me"))
     color: "#f3c34b"
     font.pixelSize: 12
-    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: link.toggled() }
+    // Larger than the small text, for fingers.
+    MouseArea { anchors.fill: parent; anchors.margins: -12; cursorShape: Qt.PointingHandCursor; onClicked: link.toggled() }
 }

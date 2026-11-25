@@ -20,6 +20,19 @@ bool validTime(const QString &time) {
     static const QRegularExpression pattern("^([01]\\d|2[0-3]):[0-5]\\d$");
     return pattern.match(time).hasMatch();
 }
+
+// Groups in A–Z order ignoring case and accents ("abends", "Morgens",
+// "Übungen"). Done by hand: Qt for Android has no ICU, so QCollator there
+// can neither ignore case nor place Ü next to U.
+bool groupBefore(const QString &a, const QString &b) {
+    const auto key = [](const QString &s) {
+        QString k = s.normalized(QString::NormalizationForm_D).toCaseFolded();
+        k.removeIf([](QChar c) { return c.isMark(); });
+        return k;
+    };
+    const QString ka = key(a), kb = key(b);
+    return ka != kb ? ka < kb : a < b;
+}
 } // namespace
 
 HabitBook::HabitBook(Profile *profile, QObject *parent) : QObject(parent), m_profile(profile) {
@@ -60,6 +73,11 @@ void HabitBook::touch() {
     emit changed();
 }
 
+void HabitBook::markEdited() {
+    touch();
+    emit edited();
+}
+
 const HabitBook::Habit *HabitBook::find(const QString &id) const {
     for (const auto &habit : m_habits)
         if (habit.id == id)
@@ -87,6 +105,8 @@ void HabitBook::shiftDay(int delta) {
 }
 
 void HabitBook::goToday() {
+    if (m_view == today())
+        return;
     m_view = today();
     touch();
 }
@@ -126,7 +146,7 @@ QString HabitBook::add(const QVariantMap &fields) {
     // so a habit can be back-filled from the day it was really started.
     habit.created = std::min(m_view, today());
     m_habits << habit;
-    touch();
+    markEdited();
     return habit.id;
 }
 
@@ -138,7 +158,7 @@ bool HabitBook::update(const QString &id, const QVariantMap &fields) {
         if (!applyFields(copy, fields))
             return false;
         habit = copy;
-        touch();
+        markEdited();
         return true;
     }
     return false;
@@ -151,7 +171,7 @@ bool HabitBook::remove(const QString &id) {
         return false;
     // The log keeps its entries: what was done stays counted in the stats,
     // and the sardines already earned are not taken away.
-    touch();
+    markEdited();
     return true;
 }
 
@@ -185,7 +205,7 @@ bool HabitBook::setStatus(const QString &id, const QString &dateText, const QStr
         }
         day.insert(id, entry);
     }
-    touch();
+    markEdited();
     return true;
 }
 
@@ -193,12 +213,13 @@ QVariantMap HabitBook::view(const Habit &habit, const QDate &date) const {
     // Seven dots for the week that holds `date`, starting on the chosen weekday.
     const int startOffset = m_profile->weekStartsMonday() ? date.dayOfWeek() - 1 : date.dayOfWeek() % 7;
     const QDate start = date.addDays(-startOffset);
+    const QDate now = today(); // A local-time lookup: once, not in the loop.
     QVariantList week;
     for (int i = 0; i < 7; ++i) {
         const QDate d = start.addDays(i);
         const QString s = status(habit.id, d);
         // 3 done, 2 skipped, 1 scheduled but open/missed, 0 not scheduled or future.
-        week << (s == "done" ? 3 : s == "skipped" ? 2 : (d <= today() && isScheduled(habit, d)) ? 1 : 0);
+        week << (s == "done" ? 3 : s == "skipped" ? 2 : (d <= now && isScheduled(habit, d)) ? 1 : 0);
     }
     return {{"id", habit.id},
             {"name", habit.name},
@@ -231,9 +252,12 @@ QVariantList HabitBook::sections(const QString &tab, int) const {
         return result;
     }
 
+    // Without any habits the page shows its own hint instead of empty sections.
+    if (m_habits.isEmpty())
+        return result;
     // To-dos: scheduled habits by group ("" = ungrouped first, then A–Z),
     // then everything that exists but is not scheduled on this weekday.
-    QMap<QString, QVariantList> grouped;
+    QHash<QString, QVariantList> grouped;
     QVariantList unscheduled;
     grouped[QString()]; // The ungrouped section is always shown, like in Monke.
     for (const auto &h : m_habits) {
@@ -244,8 +268,10 @@ QVariantList HabitBook::sections(const QString &tab, int) const {
         else
             unscheduled << view(h, m_view);
     }
-    for (auto it = grouped.cbegin(); it != grouped.cend(); ++it)
-        result << QVariantMap{{"key", "g:" + it.key()}, {"title", it.key()}, {"habits", it.value()}};
+    QStringList names = grouped.keys();
+    std::sort(names.begin(), names.end(), groupBefore); // "" sorts first.
+    for (const auto &name : names)
+        result << QVariantMap{{"key", "g:" + name}, {"title", name}, {"habits", grouped.value(name)}};
     result << QVariantMap{{"key", "unscheduled"}, {"title", QString()}, {"habits", unscheduled}};
     return result;
 }
@@ -298,26 +324,29 @@ QDate HabitBook::firstDay() const {
     return first;
 }
 
+// The streak walks read today() once: it is a local-time lookup, and the
+// answer must not change if midnight passes mid-walk.
 int HabitBook::currentPerfectStreak() const {
-    const QDate first = firstDay();
+    const QDate first = firstDay(), now = today();
     int streak = 0;
-    for (QDate d = today(); d >= first; d = d.addDays(-1)) {
+    for (QDate d = now; d >= first; d = d.addDays(-1)) {
         const int p = perfectDay(d);
         if (p == 1)
             ++streak;
-        else if (p == 0 && d != today()) // Today is still in progress.
+        else if (p == 0 && d != now) // Today is still in progress.
             break;
     }
     return streak;
 }
 
 int HabitBook::longestPerfectStreak() const {
+    const QDate now = today();
     int best = 0, run = 0;
-    for (QDate d = firstDay(); d <= today(); d = d.addDays(1)) {
+    for (QDate d = firstDay(); d <= now; d = d.addDays(1)) {
         const int p = perfectDay(d);
         if (p == 1)
             best = std::max(best, ++run);
-        else if (p == 0 && d != today())
+        else if (p == 0 && d != now)
             run = 0;
     }
     return best;
@@ -327,16 +356,17 @@ int HabitBook::longestStreak(const Habit &habit) const {
     // Skipped days pause a streak. A missed day ends it in strict mode;
     // otherwise one missed day in a row is forgiven as a grace period.
     const bool strict = m_profile->strictStreaks();
+    const QDate now = today();
     int best = 0, run = 0;
     bool missedLast = false;
-    for (QDate d = habit.created; d.isValid() && d <= today(); d = d.addDays(1)) {
+    for (QDate d = habit.created; d.isValid() && d <= now; d = d.addDays(1)) {
         if (!isScheduled(habit, d))
             continue;
         const QString s = status(habit.id, d);
         if (s == "done") {
             best = std::max(best, ++run);
             missedLast = false;
-        } else if (s.isEmpty() && d != today()) {
+        } else if (s.isEmpty() && d != now) {
             if (strict || missedLast)
                 run = 0;
             missedLast = true;
@@ -385,7 +415,7 @@ QStringList HabitBook::groups(int) const {
         if (!h.group.isEmpty())
             set.insert(h.group);
     QStringList list(set.begin(), set.end());
-    list.sort(Qt::CaseInsensitive);
+    std::sort(list.begin(), list.end(), groupBefore); // Same order as the sections.
     return list;
 }
 
@@ -436,10 +466,14 @@ void HabitBook::fromJson(const QJsonObject &object) {
         ids.insert(h.id);
         m_habits << h;
     }
+    // Log days may lie up to two days ahead (UTC+14 vs UTC-12): after flying
+    // west, the newest ticks can be dated tomorrow. Dropping them would lose
+    // what was paid for and let those habits be paid again.
+    const QDate latest = today().addDays(2);
     const QJsonObject log = object.value("log").toObject();
     for (auto it = log.begin(); it != log.end(); ++it) {
         const QDate date = QDate::fromString(it.key(), Qt::ISODate);
-        if (!date.isValid() || date < EarliestDate || date > today())
+        if (!date.isValid() || date < EarliestDate || date > latest)
             continue;
         const QJsonObject day = it.value().toObject();
         for (auto e = day.begin(); e != day.end(); ++e) {
@@ -452,5 +486,5 @@ void HabitBook::fromJson(const QJsonObject &object) {
     }
     m_view = today();
     m_lastToday = today();
-    touch();
+    markEdited();
 }

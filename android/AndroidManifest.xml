@@ -14,6 +14,11 @@
     <!-- Reminders: notifications, and planning them again after a reboot. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Reminders on the minute. Pengu is installed directly, not from a store,
+         so it may use USE_EXACT_ALARM (13+, granted at install); Android 12
+         grants the older permission by default. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
     <supports-screens
         android:anyDensity="true"
         android:largeScreens="true"
@@ -25,6 +30,8 @@
         android:label="Pengu"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="false">
         <activity
             android:name="org.qtproject.qt.android.bindings.QtActivity"

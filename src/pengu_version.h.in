@@ -1,0 +1,7 @@
+// Written by qmake from src/pengu_version.h.in (see sources.pri).
+#pragma once
+// The preprocessor makes the strings, so no quotes go through qmake.
+#define PENGU_STRING(x) #x
+#define PENGU_BUILD $${PENGU_BUILD}
+#define PENGU_VERSION PENGU_STRING($${PENGU_VERSION})
+#define PENGU_REPO PENGU_STRING($${PENGU_REPO})

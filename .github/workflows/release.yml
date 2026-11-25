@@ -65,6 +65,8 @@ jobs:
     container: archlinux:latest
     env:
       PENGU_BUILD: ${{ needs.version.outputs.build }}
+    outputs:
+      qt: ${{ steps.package.outputs.qt }}
     steps:
       - name: Dependencies
         run: pacman -Syu --noconfirm --needed base-devel git qt6-base qt6-declarative qt6-svg qt6-wayland libnotify polkit
@@ -75,11 +77,14 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           bin/test
       - name: Package
+        id: package
         run: |
           useradd -m builder
           chown -R builder "$GITHUB_WORKSPACE"
           su builder -c "git config --global --add safe.directory '$GITHUB_WORKSPACE' && cd '$GITHUB_WORKSPACE/pkgbuild' && PENGU_BUILD=$PENGU_BUILD makepkg -f --noconfirm"
           cp pkgbuild/pengu-*-x86_64.pkg.tar.zst pengu-x86_64.pkg.tar.zst
+          # The Qt it was built with: older systems are not offered it.
+          echo "qt=$(pacman -Q qt6-base | sed -nE 's/^qt6-base ([0-9]+\.[0-9]+).*/\1/p')" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with: { name: linux, path: pengu-x86_64.pkg.tar.zst, if-no-files-found: error }
 
@@ -91,6 +96,7 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       BUILD: ${{ needs.version.outputs.build }}
+      QT: ${{ needs.linux.outputs.qt }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -102,10 +108,11 @@ jobs:
           notes=$(git log -1 --format=%s)
           jq -n --argjson build "$BUILD" --arg version "$VERSION" --arg notes "$notes" \
                 --arg apk "$(sha256sum pengu.apk | cut -d' ' -f1)" \
-                --arg pkg "$(sha256sum pengu-x86_64.pkg.tar.zst | cut -d' ' -f1)" \
+                --arg pkg "$(sha256sum pengu-x86_64.pkg.tar.zst | cut -d' ' -f1)" --arg qt "$QT" \
             '{build: $build, version: $version, notes: $notes,
               assets: {android: {file: "pengu.apk", sha256: $apk},
-                       linux: {file: "pengu-x86_64.pkg.tar.zst", sha256: $pkg}}}' > version.json
+                       linux: {file: "pengu-x86_64.pkg.tar.zst", sha256: $pkg, qt: $qt}}}' > version.json
           cat version.json
+          # Tag the commit that was built, not whatever main is by now.
           gh release create "v$VERSION" pengu.apk pengu-x86_64.pkg.tar.zst version.json \
-            --title "Pengu $VERSION" --notes "$notes" --latest
+            --target "$GITHUB_SHA" --title "Pengu $VERSION" --notes "$notes" --latest

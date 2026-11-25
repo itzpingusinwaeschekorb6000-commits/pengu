@@ -233,67 +233,73 @@ void TileMap::buildGround(TileTriangles &t) {
     if (m_island) {
         const int n = Island::Size;
         static const QColor deep[3] = {QColor("#2b4fbf"), QColor("#3157c9"), QColor("#3962d6")};
-        static const QColor shallow[3] = {QColor("#79b4e0"), QColor("#5a8fd8"), QColor("#4370cf")};
+        static const QColor shallow[2] = {QColor("#79b4e0"), QColor("#5a8fd8")};
         const QColor waterLine(15, 30, 90, 70);
         const QColor landLine(110, 90, 50, 60);
         const QColor plank(90, 60, 35, 150);
+        const QColor edge(60, 50, 30, 150);
+        const QPointF down(0, 7); // How far the cliff drops to the water.
+        // Each tile draws only its two back edges; its front edges are the
+        // back edges of the tiles in front, drawn later (the map's last row
+        // and column draw their front edges too). Drawn by both, the
+        // translucent lines would be darker on one side and at every corner.
+        const auto grid = [&](const QPolygonF &shape, int x, int y, const QColor &color) {
+            if (!m_showGrid)
+                return;
+            t.line(shape[3], shape[0], 1, color);
+            t.line(shape[0], shape[1], 1, color);
+            if (x == n - 1)
+                t.line(shape[1], shape[2], 1, color);
+            if (y == n - 1)
+                t.line(shape[3], shape[2], 1, color);
+        };
 
-        // Back to front so cliff edges overlap correctly.
-        for (int sum = 0; sum <= 2 * (n - 1); ++sum) {
+        // The water first: it is flat, so every cliff edge hangs over it.
+        for (int y = 0; y < n; ++y) {
             for (int x = 0; x < n; ++x) {
-                const int y = sum - x;
-                if (y < 0 || y >= n)
+                if (m_island->isLand(x, y))
                     continue;
-                const QPolygonF shape = diamond(x, y);
+                const int d = m_island->shoreDistance(x, y);
                 const double h = hash(x, y);
-                if (m_island->isLand(x, y)) {
-                    const QString kind = m_island->terrainKindAt(x, y);
-                    t.quad(shape, terrainColor(kind, h));
-                    if (m_showGrid)
-                        t.outline(shape, 1, landLine);
-                    if (kind == "boardwalk") {
-                        // Planks across the tile.
-                        for (int i = 1; i < 4; ++i) {
-                            const qreal f = i / 4.0;
-                            t.line(shape[0] * (1 - f) + shape[3] * f, shape[1] * (1 - f) + shape[2] * f, 1, plank);
-                        }
-                    }
-                } else {
-                    const int d = m_island->shoreDistance(x, y);
-                    const int shade = h < 0.33 ? 0 : h < 0.75 ? 1 : 2;
-                    QColor c = d <= 1 ? shallow[0] : d == 2 ? shallow[1] : deep[shade];
-                    // A loose checker like the original's ocean.
-                    if (d >= 3 && ((x / 2 + y / 2) % 2 == 0))
-                        c = c.lighter(106);
-                    t.quad(shape, c);
-                    if (m_showGrid)
-                        t.outline(shape, 1, waterLine);
-                }
+                QColor c = d <= 1 ? shallow[0] : d == 2 ? shallow[1] : deep[h < 0.33 ? 0 : h < 0.75 ? 1 : 2];
+                // A loose checker like the original's ocean.
+                if (d >= 3 && ((x / 2 + y / 2) % 2 == 0))
+                    c = c.lighter(106);
+                const QPolygonF shape = diamond(x, y);
+                t.quad(shape, c);
+                grid(shape, x, y, waterLine);
             }
         }
 
-        // A low cliff toward the viewer where land meets water, drawn after
-        // all tiles so the water in front does not cover it.
-        const QColor edge(60, 50, 30, 150);
-        const qreal depth = 7;
-        for (int sum = 0; sum <= 2 * (n - 1); ++sum) {
+        // Then the land, back to front, each tile with its low cliff toward
+        // the viewer where it meets the water. A tile in front is drawn later
+        // and covers the cliff behind it, so at a notch in the coast the cliff
+        // does not run over the sand in front.
+        for (int y = 0; y < n; ++y) {
             for (int x = 0; x < n; ++x) {
-                const int y = sum - x;
-                if (y < 0 || y >= n || !m_island->isLand(x, y))
+                if (!m_island->isLand(x, y))
                     continue;
-                const bool right = !m_island->isLand(x + 1, y), left = !m_island->isLand(x, y + 1);
-                if (!right && !left)
-                    continue;
+                const QString kind = m_island->terrainKindAt(x, y);
+                const QColor color = terrainColor(kind, hash(x, y));
                 const QPolygonF shape = diamond(x, y);
-                const QColor side = terrainColor(m_island->terrainKindAt(x, y), hash(x, y)).darker(140);
-                const QPointF down(0, depth);
-                for (const auto &face : {right ? QPolygonF{shape[1], shape[2], shape[2] + down, shape[1] + down} : QPolygonF(),
-                                         left ? QPolygonF{shape[3], shape[2], shape[2] + down, shape[3] + down} : QPolygonF()}) {
-                    if (face.isEmpty())
-                        continue;
-                    t.quad(face, side);
-                    t.outline(face, 1, edge);
+                t.quad(shape, color);
+                grid(shape, x, y, landLine);
+                if (kind == "boardwalk") {
+                    // Planks across the tile.
+                    for (int i = 1; i < 4; ++i) {
+                        const qreal f = i / 4.0;
+                        t.line(shape[0] * (1 - f) + shape[3] * f, shape[1] * (1 - f) + shape[2] * f, 1, plank);
+                    }
                 }
+                const auto cliff = [&](QPointF a, QPointF b) {
+                    const QPolygonF face{a, b, b + down, a + down};
+                    t.quad(face, color.darker(140));
+                    t.outline(face, 1, edge);
+                };
+                if (!m_island->isLand(x + 1, y))
+                    cliff(shape[1], shape[2]);
+                if (!m_island->isLand(x, y + 1))
+                    cliff(shape[3], shape[2]);
             }
         }
     }

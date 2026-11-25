@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Pengu
 
 // The island: an isometric tile map with decorations and the penguin on top.
@@ -100,11 +101,13 @@ Item {
         Repeater {
             model: island.objectModel
             delegate: Image {
+                required property int uid
                 required property bool glow
                 required property int tileX
                 required property int tileY
                 visible: glow
-                readonly property point c: tiles.tileCenter(tileX, tileY)
+                // Follows its object while that is dragged.
+                readonly property point c: dragger.uid === uid ? dragger.pos : tiles.tileCenter(tileX, tileY)
                 width: 150
                 height: 75
                 x: c.x - width / 2
@@ -118,6 +121,28 @@ Item {
                     NumberAnimation { to: 0.8; duration: 900 + Math.random() * 400; easing.type: Easing.InOutSine }
                     NumberAnimation { to: 1.0; duration: 900 + Math.random() * 400; easing.type: Easing.InOutSine }
                 }
+            }
+        }
+
+        // The terrain tile picked in build mode, outlined like a picked object.
+        Shape {
+            visible: view.editing && view.selectedTile.x >= 0
+            readonly property point c: tiles.tileCenter(view.selectedTile.x, view.selectedTile.y)
+            x: c.x - width / 2
+            y: c.y - height / 2
+            width: tiles.tileWidth // 64 x 32, as the path below.
+            height: tiles.tileHeight
+            z: 2 // Above the glow, below every object.
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: Qt.rgba(1, 1, 1, 0.8)
+                strokeWidth: 2 / view.zoom
+                fillColor: Qt.rgba(1, 1, 1, 0.22)
+                startX: 32; startY: 0
+                PathLine { x: 64; y: 16 }
+                PathLine { x: 32; y: 32 }
+                PathLine { x: 0; y: 16 }
+                PathLine { x: 32; y: 0 }
             }
         }
 
@@ -219,14 +244,18 @@ Item {
     }
 
     function pointerMoved(px, py) {
-        if (Math.abs(px - pointer.pressPos.x) + Math.abs(py - pointer.pressPos.y) > 5)
+        // A finger wobbles more than a mouse; a shaky tap must not pan.
+        if (Math.hypot(px - pointer.pressPos.x, py - pointer.pressPos.y) > (pointer.lift > 0 ? 10 : 5))
             pointer.movedFar = true
         if (!pointer.movedFar)
             return
         if (pointer.pressUid) {
             // Dragging a placed object.
-            dragger.uid = pointer.pressUid
-            selectedUid = pointer.pressUid
+            if (!dragger.uid) {
+                clearSelection()
+                selectedUid = pointer.pressUid
+                dragger.uid = pointer.pressUid
+            }
             const t = tileAtView(px, py - pointer.lift)
             dragger.pos = Qt.point((px - world.x) / zoom, (py - pointer.lift - world.y) / zoom + 10)
             if (t.x !== tiles.highlight.x || t.y !== tiles.highlight.y) {
@@ -245,13 +274,13 @@ Item {
         const t = tileAtView(px, py - (dragger.uid ? pointer.lift : 0))
         if (dragger.uid) {
             if (t.x >= 0 && !island.move(dragger.uid, t.x, t.y))
-                placeFailed("occupied")
+                placeFailed(island.isLand(t.x, t.y) ? "occupied" : "water")
             dragger.uid = 0
             tiles.highlight = Qt.point(-1, -1)
             moved()
             return
         }
-        if (pointer.movedFar || !editing || t.x < 0)
+        if (pointer.movedFar || !editing)
             return
         if (rightButton) {
             placing = ""
@@ -259,6 +288,8 @@ Item {
             return
         }
         if (placing !== "") {
+            if (t.x < 0)
+                return
             const reason = island.canPlace(placing, t.x, t.y)
             if (reason !== "" || !island.place(placing, t.x, t.y)) {
                 placeFailed(reason)
@@ -271,11 +302,12 @@ Item {
             tiles.highlightOk = placing !== "" && island.canPlace(placing, t.x, t.y) === ""
             return
         }
-        const uid = island.objectAt(t.x, t.y)
+        // Select what was pressed: the picture under the pointer (as a drag
+        // would take it), else the terrain tile.
         clearSelection()
-        if (uid)
-            selectedUid = uid
-        else if (island.terrainAt(t.x, t.y) !== "")
+        if (pointer.pressUid)
+            selectedUid = pointer.pressUid
+        else if (t.x >= 0 && island.terrainAt(t.x, t.y) !== "")
             selectedTile = t
     }
 
@@ -307,8 +339,9 @@ Item {
         onCanceled: view.pointerCanceled()
         onExited: tiles.highlight = Qt.point(-1, -1)
         onWheel: (w) => view.zoomBy(Math.pow(1.0015, w.angleDelta.y), w.x, w.y)
-        cursorShape: view.editing && (view.placing !== "" || containsMouse && pointer.pressUid) ? Qt.PointingHandCursor
-                   : pressed && pointer.movedFar ? Qt.ClosedHandCursor : Qt.ArrowCursor
+        cursorShape: view.editing && view.placing !== "" ? Qt.PointingHandCursor
+                   : pressed && pointer.movedFar ? Qt.ClosedHandCursor
+                   : view.editing && pressed && pointer.pressUid ? Qt.PointingHandCursor : Qt.ArrowCursor
     }
 
     // Fingers on a touch screen. One finger works like the mouse. Two
@@ -417,6 +450,15 @@ Item {
     onEditingChanged: {
         placing = ""
         clearSelection()
+        // Leaving build mode mid-drag (B or Esc) drops the object back on its
+        // tile; the rest of the gesture pans from here, without a jump.
+        if (dragger.uid) {
+            dragger.uid = 0
+            pointer.pressPos = Qt.point(mouse.mouseX, mouse.mouseY)
+            pointer.pressCamX = camX
+            pointer.pressCamY = camY
+        }
+        pointer.pressUid = 0
         tiles.highlight = Qt.point(-1, -1)
     }
     onPlacingChanged: if (placing === "") tiles.highlight = Qt.point(-1, -1)

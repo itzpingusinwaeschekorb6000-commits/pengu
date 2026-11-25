@@ -6,7 +6,8 @@ Rectangle {
     id: help
     signal close()
     color: Qt.rgba(0, 0, 0, 0.7)
-    MouseArea { anchors.fill: parent; onClicked: help.close() }
+    // Takes hover and the wheel too, so nothing behind reacts (tooltips, zoom).
+    MouseArea { anchors.fill: parent; hoverEnabled: true; onWheel: (wheel) => wheel.accepted = true; onClicked: help.close() }
 
     Rectangle {
         anchors.centerIn: parent

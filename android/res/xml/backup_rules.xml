@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Downloaded updates are not backed up: a 33 MB APK would push the app over Auto Backup's 25 MB limit. -->
+<full-backup-content>
+    <exclude domain="file" path="updates/"/>
+</full-backup-content>

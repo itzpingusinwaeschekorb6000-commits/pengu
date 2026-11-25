@@ -51,6 +51,15 @@ Flickable {
                 }
             }
             SettingRow {
+                // Android denied Pengu's notifications, or they were switched
+                // off in the phone's settings: say so and lead there.
+                visible: reminders.blocked
+                title: qsTr("Blocked by Android")
+                description: qsTr("Reminders cannot arrive until you allow Pengu's notifications in Android's settings.")
+                descriptionColor: "#f0a35e"
+                PillButton { text: qsTr("Allow"); fill: Ui.blue; onClicked: reminders.openSystemSettings() }
+            }
+            SettingRow {
                 title: qsTr("Evening Reminder")
                 description: qsTr("%1 will remind you at 20:00 to complete any remaining habits.").arg(profile.penguinName)
                 opacity: profile.notifications ? 1 : 0.5
@@ -87,7 +96,7 @@ Flickable {
             }
             SettingRow {
                 title: qsTr("Reset XP & Sardines")
-                description: qsTr("Level %1 • %2 XP • %3 sardines").arg(profile.level).arg(profile.xp).arg(profile.fish)
+                description: qsTr("Level %1 • %2 XP • %3 sardines", "", Math.abs(profile.fish)).arg(profile.level).arg(profile.xp).arg(profile.fish)
                 PillButton { text: qsTr("Reset"); fill: Ui.red; onClicked: confirmReset.open() }
             }
         }
@@ -137,7 +146,9 @@ Flickable {
         title: qsTr("Reset XP & Sardines?")
         Material.roundedScale: theme.radius
         Label {
-            width: 320
+            // With the dialog's padding this fits a 360 dp phone. A width that
+            // follows the window would loop through the dialog's height.
+            width: 280
             wrapMode: Text.Wrap
             text: qsTr("Your level goes back to 1 and your sardines to 0. Habits, history and the island stay.")
         }

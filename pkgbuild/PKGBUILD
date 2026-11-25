@@ -6,7 +6,11 @@ pkgrel=1
 pkgdesc='Build habits and grow an African penguin island'
 arch=('x86_64' 'aarch64')
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'libnotify' 'polkit')
+# Qt programs need at least the Qt version they were built with (version
+# tags), so pacman never installs this next to an older Qt.
+_qt="$(pacman -Q qt6-base 2>/dev/null | sed -nE 's/^qt6-base ([0-9]+\.[0-9]+).*/\1/p')"
+depends=("qt6-base${_qt:+>=$_qt}" "qt6-declarative${_qt:+>=$_qt}" "qt6-svg${_qt:+>=$_qt}"
+         "qt6-wayland${_qt:+>=$_qt}" 'libnotify' 'polkit')
 makedepends=('gcc' 'make' 'git')
 options=('!debug')
 source=()

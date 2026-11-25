@@ -85,13 +85,15 @@ public:
     void fromJson(const QJsonObject &object);
 
 signals:
-    void changed();
+    void changed(); // Anything shown changed, including the day being viewed.
+    void edited();  // Habits or the log changed: something to save and replan.
 
 private:
     bool applyFields(Habit &habit, const QVariantMap &fields) const;
     QVariantMap view(const Habit &habit, const QDate &date) const;
     QDate firstDay() const;
     void touch();
+    void markEdited();
 
     Profile *m_profile;
     QList<Habit> m_habits;

@@ -17,13 +17,18 @@ Rectangle {
 
     Keys.onEscapePressed: closed()
 
+    // Takes presses on the sheet's empty parts, so they do not reach the
+    // dimmed backdrop below, which closes the sheet.
+    MouseArea { anchors.fill: parent }
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 18
         spacing: 10
+        // On a narrow phone the title wraps rather than running under the button.
         RowLayout {
-            Text { Layout.fillWidth: true; text: qsTr("Add from Templates"); color: Ui.text; font.pixelSize: 22; font.bold: true }
-            PillButton { text: qsTr("Custom habit"); fill: Ui.card; onClicked: sheet.custom() }
+            Text { Layout.fillWidth: true; text: qsTr("Add from Templates"); color: Ui.text; font.pixelSize: 22; font.bold: true; wrapMode: Text.WordWrap }
+            PillButton { Layout.minimumWidth: implicitWidth; text: qsTr("Custom habit"); fill: Ui.card; onClicked: sheet.custom() }
         }
         ListView {
             id: list

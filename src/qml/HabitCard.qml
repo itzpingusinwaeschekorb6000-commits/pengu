@@ -1,9 +1,9 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 // One habit. Drag right for Done/Skip (or Undo), drag left for Edit/Delete,
-// click to open the done side, right-click for every action at once.
+// click to open the done side, right-click for every action at once (the
+// page shows one shared menu for that).
 Item {
     id: card
     property var habit: ({})
@@ -14,6 +14,7 @@ Item {
     signal undo()
     signal edit()
     signal remove()
+    signal menuRequested()
 
     // Wide enough for the German labels ("Überspringen").
     readonly property int actionWidth: 116
@@ -24,8 +25,10 @@ Item {
 
     function close() { face.x = 0 }
 
-    // Actions revealed by dragging right.
+    // Actions revealed by dragging right. The swipe works in physical
+    // directions, so these rows stay put in right-to-left languages too.
     Row {
+        LayoutMirroring.enabled: false
         visible: face.x > 1
         anchors.left: parent.left
         height: parent.height
@@ -51,6 +54,7 @@ Item {
     }
     // Actions revealed by dragging left.
     Row {
+        LayoutMirroring.enabled: false
         visible: face.x < -1
         anchors.right: parent.right
         height: parent.height
@@ -73,9 +77,9 @@ Item {
         implicitHeight: content.implicitHeight + 24
         height: implicitHeight
         radius: Math.min(14, 8 + theme.radius)
-        color: hover.containsMouse && !card.preview ? Ui.cardHi : Ui.card
+        color: swipe.containsMouse ? Ui.cardHi : Ui.card
         border.color: Ui.line
-        Behavior on x { enabled: !drag.drag.active; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on x { enabled: !swipe.drag.active; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
         RowLayout {
             id: content
@@ -141,13 +145,14 @@ Item {
             }
         }
 
+        // No preventStealing: a vertical swipe must scroll the list. Once a
+        // sideways drag starts, the MouseArea keeps the grab by itself.
         MouseArea {
-            id: drag
+            id: swipe
             anchors.fill: parent
             enabled: !card.preview
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            preventStealing: true
             cursorShape: Qt.PointingHandCursor
             drag.target: face
             drag.axis: Drag.XAxis
@@ -157,32 +162,17 @@ Item {
             property real startX: 0
             onPressed: startX = face.x
             onReleased: {
-                if (!drag.active && Math.abs(face.x - startX) < 6)
+                if (!swipe.drag.active && Math.abs(face.x - startX) < 6)
                     return
                 face.x = face.x > card.leftWidth / 2 ? card.leftWidth : face.x < -card.rightWidth / 2 ? -card.rightWidth : 0
             }
             onClicked: (e) => {
                 if (e.button === Qt.RightButton) {
-                    menu.popup()
+                    card.menuRequested()
                     return
                 }
                 face.x = face.x !== 0 ? 0 : card.leftWidth
             }
         }
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            acceptedButtons: Qt.NoButton
-        }
-    }
-
-    Menu {
-        id: menu
-        MenuItem { visible: card.mode === "todo"; height: visible ? implicitHeight : 0; text: qsTr("Done"); onTriggered: card.markDone() }
-        MenuItem { visible: card.mode === "todo"; height: visible ? implicitHeight : 0; text: qsTr("Skip"); onTriggered: card.markSkipped() }
-        MenuItem { visible: card.mode !== "todo"; height: visible ? implicitHeight : 0; text: qsTr("Undo"); onTriggered: card.undo() }
-        MenuItem { text: qsTr("Edit"); onTriggered: card.edit() }
-        MenuItem { text: qsTr("Delete"); onTriggered: card.remove() }
     }
 }
